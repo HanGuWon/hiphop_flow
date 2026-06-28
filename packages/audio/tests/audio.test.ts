@@ -33,10 +33,10 @@ describe("@hipflow/audio", () => {
     expect(engine.getTransportSnapshot().bpm).toBe(104);
   });
 
-  it("collects four kick hits in a 16-step cycle", () => {
+  it("collects four kick hits in a 32-step cycle", () => {
     let project = createDefaultProject();
 
-    [0, 4, 8, 12].forEach((stepIndex) => {
+    [0, 8, 16, 24].forEach((stepIndex) => {
       project = mustApply(project, { type: "drum/toggleStep", channelId: "kick", stepIndex });
     });
 
@@ -44,7 +44,7 @@ describe("@hipflow/audio", () => {
 
     expect(hits.ok).toBe(true);
     if (hits.ok) {
-      expect(hits.value.map((hit) => hit.stepIndex)).toEqual([0, 4, 8, 12]);
+      expect(hits.value.map((hit) => hit.stepIndex)).toEqual([0, 8, 16, 24]);
     }
   });
 

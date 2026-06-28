@@ -75,7 +75,7 @@ describe("drum sequencing", () => {
     const invalidStep = applyCommand(project, {
       type: "drum/toggleStep",
       channelId: "kick",
-      stepIndex: 16
+      stepIndex: 32
     });
     expect(invalidStep.ok).toBe(false);
     if (!invalidStep.ok) {

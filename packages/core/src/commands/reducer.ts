@@ -14,6 +14,7 @@ import {
   addBar,
   mergeCells,
   removeBar,
+  resizeCellBySteps,
   selectCells,
   splitCell,
   updateCellText
@@ -83,6 +84,9 @@ export const applyCommand = (
 
     case "lyrics/mergeCells":
       return ensureValid(mergeCells(project, command.cellIds));
+
+    case "lyrics/resizeCellBySteps":
+      return ensureValid(resizeCellBySteps(project, command.cellId, command.deltaSteps));
 
     case "lyrics/selectCells":
       return ensureValid(selectCells(project, command.cellIds));

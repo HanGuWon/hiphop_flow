@@ -1,5 +1,6 @@
 import {
   canMergeCells,
+  canResizeCellBySteps,
   canSplitCell,
   type Bar,
   type DrumChannel,
@@ -37,3 +38,7 @@ export const selectCanMergeSelectedCells = (snapshot: AppSnapshot): boolean =>
 export const selectCanSplitSelectedCell = (snapshot: AppSnapshot, parts: number): boolean =>
   snapshot.selectedCellIds.length === 1 &&
   canSplitCell(snapshot.project, snapshot.selectedCellIds[0], parts);
+
+export const selectCanResizeSelectedCell = (snapshot: AppSnapshot, deltaSteps: number): boolean =>
+  snapshot.selectedCellIds.length === 1 &&
+  canResizeCellBySteps(snapshot.project, snapshot.selectedCellIds[0], deltaSteps);

@@ -1,5 +1,11 @@
 import { err, ok, type Result } from "@hipflow/shared";
-import { createDefaultBar, getBarTicks, type Bar, type LyricCell } from "../model/lyricGrid";
+import {
+  LYRIC_RESIZE_STEP_TICKS,
+  createDefaultBar,
+  getBarTicks,
+  type Bar,
+  type LyricCell
+} from "../model/lyricGrid";
 import type { Project } from "../model/project";
 import { commandError, type CommandError } from "./commandTypes";
 
@@ -31,6 +37,71 @@ const replaceBar = (project: Project, barIndex: number, bar: Bar): Project => ({
   ...project,
   bars: project.bars.map((candidate, index) => (index === barIndex ? bar : candidate))
 });
+
+const canApplyResizeDelta = (location: CellLocation, deltaTicks: number): boolean => {
+  const cells = location.bar.lyricCells;
+  const currentDuration = location.cell.durationTicks + deltaTicks;
+
+  if (currentDuration < LYRIC_RESIZE_STEP_TICKS) {
+    return false;
+  }
+
+  if (location.cellIndex < cells.length - 1) {
+    const nextCell = cells[location.cellIndex + 1];
+
+    return nextCell.durationTicks - deltaTicks >= LYRIC_RESIZE_STEP_TICKS;
+  }
+
+  if (location.cellIndex > 0) {
+    const previousCell = cells[location.cellIndex - 1];
+
+    return previousCell.durationTicks - deltaTicks >= LYRIC_RESIZE_STEP_TICKS;
+  }
+
+  return false;
+};
+
+const resizeCells = (location: CellLocation, deltaTicks: number): LyricCell[] => {
+  const cells = location.bar.lyricCells;
+
+  if (location.cellIndex < cells.length - 1) {
+    const resizedDuration = location.cell.durationTicks + deltaTicks;
+
+    return cells.map((cell, index) => {
+      if (index === location.cellIndex) {
+        return { ...cell, durationTicks: resizedDuration };
+      }
+
+      if (index === location.cellIndex + 1) {
+        return {
+          ...cell,
+          startTick: location.cell.startTick + resizedDuration,
+          durationTicks: cell.durationTicks - deltaTicks
+        };
+      }
+
+      return cell;
+    });
+  }
+
+  const previousCell = cells[location.cellIndex - 1];
+
+  return cells.map((cell, index) => {
+    if (index === location.cellIndex - 1) {
+      return { ...cell, durationTicks: previousCell.durationTicks - deltaTicks };
+    }
+
+    if (index === location.cellIndex) {
+      return {
+        ...cell,
+        startTick: cell.startTick - deltaTicks,
+        durationTicks: cell.durationTicks + deltaTicks
+      };
+    }
+
+    return cell;
+  });
+};
 
 export const updateCellText = (
   project: Project,
@@ -106,6 +177,20 @@ export const canSplitCell = (project: Project, cellId: string, parts: number): b
   );
 };
 
+export const canResizeCellBySteps = (
+  project: Project,
+  cellId: string,
+  deltaSteps: number
+): boolean => {
+  const location = findCellLocation(project, cellId);
+
+  if (!location || !Number.isInteger(deltaSteps) || deltaSteps === 0) {
+    return false;
+  }
+
+  return canApplyResizeDelta(location, deltaSteps * LYRIC_RESIZE_STEP_TICKS);
+};
+
 export const canMergeCells = (project: Project, cellIds: string[]): boolean => {
   if (cellIds.length < 2) {
     return false;
@@ -179,6 +264,35 @@ export const mergeCells = (
     ...replaceBar(project, first.barIndex, nextBar),
     selectedCellIds: [mergedCell.id]
   });
+};
+
+export const resizeCellBySteps = (
+  project: Project,
+  cellId: string,
+  deltaSteps: number
+): Result<Project, CommandError> => {
+  const location = findCellLocation(project, cellId);
+
+  if (!location) {
+    return err(commandError("CELL_NOT_FOUND", `Cell '${cellId}' was not found.`));
+  }
+
+  if (!Number.isInteger(deltaSteps) || deltaSteps === 0) {
+    return err(commandError("INVALID_RESIZE", "Resize delta must be a non-zero whole number."));
+  }
+
+  const deltaTicks = deltaSteps * LYRIC_RESIZE_STEP_TICKS;
+
+  if (!canApplyResizeDelta(location, deltaTicks)) {
+    return err(commandError("INVALID_RESIZE", "Lyric cell cannot be resized past its neighbor."));
+  }
+
+  const nextBar: Bar = {
+    ...location.bar,
+    lyricCells: resizeCells(location, deltaTicks)
+  };
+
+  return ok(replaceBar(project, location.barIndex, nextBar));
 };
 
 export const selectCells = (

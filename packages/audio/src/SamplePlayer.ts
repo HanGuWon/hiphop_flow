@@ -27,6 +27,10 @@ export class SamplePlayer implements SampleTriggerer {
     this.players.set(channelId, player);
   }
 
+  hasSample(channelId: string): boolean {
+    return this.players.has(channelId);
+  }
+
   trigger(channelId: string, time: number, velocity: number): void {
     const player = this.players.get(channelId);
 

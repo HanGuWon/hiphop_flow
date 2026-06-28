@@ -30,5 +30,6 @@ export interface SampleTrigger {
 
 export interface SampleTriggerer {
   loadSample(channelId: string, url: string): Promise<void>;
+  hasSample?(channelId: string): boolean;
   trigger(channelId: string, time: number, velocity: number): void;
 }

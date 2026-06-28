@@ -10,6 +10,7 @@ import type { AudioEngine, TransportSnapshot } from "@hipflow/audio";
 import { err, ok, type Result } from "@hipflow/shared";
 import type { AppSnapshot, AppSnapshotListener } from "./events";
 
+const DEFAULT_TRANSPORT_PULSES_PER_BAR = 192;
 const cloneSerializable = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
 const defaultTransportSnapshot = (project: Project): TransportSnapshot => ({
@@ -20,7 +21,7 @@ const defaultTransportSnapshot = (project: Project): TransportSnapshot => ({
   stepIndex16: 0,
   tickInBar: 0,
   pulseIndex: 0,
-  pulsesPerBar: 96,
+  pulsesPerBar: DEFAULT_TRANSPORT_PULSES_PER_BAR,
   stepIndexByChannel: Object.fromEntries(
     project.drumRack.channels.map((channel) => [channel.id, 0])
   )
@@ -132,7 +133,7 @@ export class FlowStudioController {
       this.audioEngine.setBpm(command.bpm);
     }
 
-    if (command.type.startsWith("drum/")) {
+    if (command.type.startsWith("drum/") || command.type.startsWith("project/")) {
       this.syncAudioProject();
     }
   }

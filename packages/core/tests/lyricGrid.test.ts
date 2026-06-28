@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_STEPS_PER_BAR,
-  STEP_TICKS_16,
+  LYRIC_RESIZE_STEP_TICKS,
+  STEP_TICKS_DEFAULT,
   applyCommand,
   createDefaultProject,
   validateProject,
@@ -15,12 +16,12 @@ const expectValid = (project: ReturnType<typeof createDefaultProject>): void => 
 };
 
 describe("lyric grid commands", () => {
-  it("creates a default bar with 16 cells of 240 ticks", () => {
+  it("creates a default bar with 32 cells of 120 ticks", () => {
     const project = createDefaultProject();
     const firstBar = project.bars[0];
 
     expect(firstBar.lyricCells).toHaveLength(DEFAULT_STEPS_PER_BAR);
-    expect(firstBar.lyricCells.every((cell) => cell.durationTicks === STEP_TICKS_16)).toBe(true);
+    expect(firstBar.lyricCells.every((cell) => cell.durationTicks === STEP_TICKS_DEFAULT)).toBe(true);
     expectValid(project);
   });
 
@@ -39,7 +40,7 @@ describe("lyric grid commands", () => {
       return;
     }
 
-    expect(split.value.bars[0].lyricCells.slice(0, 3).map((cell) => cell.durationTicks)).toEqual([80, 80, 80]);
+    expect(split.value.bars[0].lyricCells.slice(0, 3).map((cell) => cell.durationTicks)).toEqual([40, 40, 40]);
     expectValid(split.value);
 
     const merge = applyCommand(split.value, {
@@ -52,9 +53,68 @@ describe("lyric grid commands", () => {
       return;
     }
 
-    expect(merge.value.bars[0].lyricCells[0].durationTicks).toBe(STEP_TICKS_16);
+    expect(merge.value.bars[0].lyricCells[0].durationTicks).toBe(STEP_TICKS_DEFAULT);
     expect(merge.value.bars[0].lyricCells).toHaveLength(DEFAULT_STEPS_PER_BAR);
     expectValid(merge.value);
+  });
+
+  it("resizes a lyric cell by nudge steps while keeping the bar gapless", () => {
+    const project = createDefaultProject();
+    const firstCellId = project.bars[0].lyricCells[0].id;
+
+    const grown = applyCommand(project, {
+      type: "lyrics/resizeCellBySteps",
+      cellId: firstCellId,
+      deltaSteps: 1
+    });
+
+    expect(grown.ok).toBe(true);
+    if (!grown.ok) {
+      return;
+    }
+
+    expect(grown.value.bars[0].lyricCells[0].durationTicks).toBe(
+      STEP_TICKS_DEFAULT + LYRIC_RESIZE_STEP_TICKS
+    );
+    expect(grown.value.bars[0].lyricCells[1].startTick).toBe(
+      STEP_TICKS_DEFAULT + LYRIC_RESIZE_STEP_TICKS
+    );
+    expect(grown.value.bars[0].lyricCells[1].durationTicks).toBe(
+      STEP_TICKS_DEFAULT - LYRIC_RESIZE_STEP_TICKS
+    );
+    expectValid(grown.value);
+
+    const restored = applyCommand(grown.value, {
+      type: "lyrics/resizeCellBySteps",
+      cellId: firstCellId,
+      deltaSteps: -1
+    });
+
+    expect(restored.ok).toBe(true);
+    if (!restored.ok) {
+      return;
+    }
+
+    expect(restored.value.bars[0].lyricCells[0].durationTicks).toBe(STEP_TICKS_DEFAULT);
+    expect(restored.value.bars[0].lyricCells[1].startTick).toBe(STEP_TICKS_DEFAULT);
+    expectValid(restored.value);
+  });
+
+  it("adds bars with the same 32-cell lyric grid", () => {
+    let project = createDefaultProject();
+
+    for (let index = 1; index < 8; index += 1) {
+      const added = applyCommand(project, { type: "project/addBar" });
+
+      expect(added.ok).toBe(true);
+      if (added.ok) {
+        project = added.value;
+      }
+    }
+
+    expect(project.bars).toHaveLength(8);
+    expect(project.bars.every((bar) => bar.lyricCells.length === DEFAULT_STEPS_PER_BAR)).toBe(true);
+    expectValid(project);
   });
 
   it("rejects non-adjacent merge and invalid split divisors", () => {

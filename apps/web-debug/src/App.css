@@ -91,9 +91,26 @@ input {
   cursor: pointer;
 }
 
+.command-button:disabled,
+.tool-button:disabled {
+  color: #6f7b7e;
+  border-color: #3c4648;
+  background: #202628;
+  cursor: not-allowed;
+}
+
 .command-button:hover,
-.command-button:focus-visible {
+.command-button:focus-visible,
+.tool-button:hover,
+.tool-button:focus-visible {
   border-color: #f0c759;
+}
+
+.command-button:disabled:hover,
+.command-button:disabled:focus-visible,
+.tool-button:disabled:hover,
+.tool-button:disabled:focus-visible {
+  border-color: #3c4648;
 }
 
 .play-button {
@@ -139,7 +156,7 @@ input {
 
 .step-number-grid {
   display: grid;
-  grid-template-columns: repeat(96, minmax(0, 1fr));
+  grid-template-columns: repeat(192, minmax(0, 1fr));
   gap: 2px;
 }
 
@@ -197,7 +214,7 @@ input {
 
 .step-grid {
   display: grid;
-  grid-template-columns: repeat(96, minmax(0, 1fr));
+  grid-template-columns: repeat(192, minmax(0, 1fr));
   gap: 3px;
 }
 
@@ -233,6 +250,36 @@ input {
   padding: 12px;
 }
 
+.lyrics-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 1280px;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tool-button {
+  min-width: 66px;
+  min-height: 32px;
+  border: 1px solid #607074;
+  border-radius: 6px;
+  color: #eef4f2;
+  background: #30383b;
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.nudge-button {
+  min-width: 36px;
+  font-size: 1rem;
+}
+
 .bar-row {
   display: grid;
   grid-template-columns: 74px minmax(0, 1fr);
@@ -255,20 +302,21 @@ input {
 
 .lyric-cells {
   display: flex;
-  min-width: 720px;
+  min-width: 1280px;
   border: 1px solid #3f4a4d;
   border-right: 0;
 }
 
 .lyric-cell {
-  min-width: 38px;
+  min-width: 28px;
   height: 52px;
   border: 0;
   border-right: 1px solid #3f4a4d;
   border-radius: 0;
-  padding: 0 6px;
+  padding: 0 4px;
   color: #16100c;
   background: #f37d25;
+  font-size: 0.78rem;
   text-align: center;
   font-weight: 800;
   outline: none;
@@ -325,6 +373,10 @@ input {
   }
 
   .lyric-cells {
-    min-width: 620px;
+    min-width: 1040px;
+  }
+
+  .lyrics-toolbar {
+    min-width: 1040px;
   }
 }

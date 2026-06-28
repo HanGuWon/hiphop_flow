@@ -67,10 +67,24 @@ export class ToneTransportEngine implements AudioEngine {
   }
 
   async play(): Promise<void> {
+    this.tone = this.tone ?? (await import("tone"));
     this.isPlaying = true;
     this.startUiHeartbeat();
-    this.tone = this.tone ?? (await import("tone"));
-    await this.tone.start();
+    this.emit(this.currentSnapshot());
+
+    try {
+      await this.tone.loaded();
+      await this.tone.start();
+    } catch (error) {
+      this.isPlaying = false;
+      this.clearUiHeartbeat();
+      this.emit(this.currentSnapshot());
+      throw error;
+    }
+
+    if (!this.isPlaying) {
+      return;
+    }
 
     if (this.scheduledEventId !== undefined) {
       this.tone.Transport.clear(this.scheduledEventId);
@@ -147,6 +161,10 @@ export class ToneTransportEngine implements AudioEngine {
 
     if (triggerSamples) {
       frame.value.hits.forEach((hit) => {
+        if (this.samplePlayer.hasSample?.(hit.channelId) === false) {
+          return;
+        }
+
         this.samplePlayer.trigger(hit.channelId, time, hit.velocity);
       });
     }
@@ -190,7 +208,9 @@ export class ToneTransportEngine implements AudioEngine {
       }
 
       if (Date.now() - this.lastToneAdvanceAt > stepMs * 1.5) {
-        this.advanceOneStep(0, false);
+        const tone = this.tone;
+        const canTriggerSamples = tone?.context.state === "running";
+        this.advanceOneStep(canTriggerSamples && tone ? tone.now() : 0, canTriggerSamples);
       }
     }, Math.max(30, stepMs / 2));
   }

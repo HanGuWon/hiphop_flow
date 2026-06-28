@@ -10,7 +10,7 @@ HipFlow Studio is a web-first songwriting and rap flow sketching app. The first 
 - `packages/ui-contract`: `FlowStudioController`, app snapshots, events, and selectors for frontend agents.
 - `apps/web-debug`: minimal Vite React UI for validating the engine. It is intentionally not the production UI.
 
-The main invariant is that the lyric grid is stored in musical ticks, not visual columns. In 4/4, one bar is `3840` ticks and the default 16 cells are `240` ticks each. Split and merge operations must preserve full-bar coverage with no gaps or overlaps.
+The main invariant is that the lyric grid is stored in musical ticks, not visual columns. In 4/4, one bar is `3840` ticks and the default 32 cells are `120` ticks each. Split, merge, and resize operations must preserve full-bar coverage with no gaps or overlaps.
 
 ## Commands
 

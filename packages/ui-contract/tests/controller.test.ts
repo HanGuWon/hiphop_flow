@@ -1,5 +1,33 @@
 import { describe, expect, it } from "vitest";
+import type { AudioEngine, TransportSnapshot } from "@hipflow/audio";
+import type { DrumRack, Pattern } from "@hipflow/core";
 import { FlowStudioController, selectCanSplitSelectedCell, selectDrumChannels } from "../src";
+
+class MockAudioEngine implements AudioEngine {
+  readonly patterns: Pattern[] = [];
+
+  async loadSample(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  setBpm(): void {}
+
+  setPattern(pattern: Pattern, _drumRack: DrumRack): void {
+    this.patterns.push(pattern);
+  }
+
+  async play(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  pause(): void {}
+
+  stop(): void {}
+
+  subscribeToTransport(_listener: (snapshot: TransportSnapshot) => void): () => void {
+    return () => {};
+  }
+}
 
 describe("@hipflow/ui-contract", () => {
   it("dispatches commands and notifies subscribers", () => {
@@ -49,5 +77,16 @@ describe("@hipflow/ui-contract", () => {
       "hihat"
     ]);
     expect(selectCanSplitSelectedCell(snapshot, 3)).toBe(true);
+  });
+
+  it("syncs audio pattern length after adding bars", () => {
+    const controller = new FlowStudioController();
+    const audioEngine = new MockAudioEngine();
+
+    controller.setAudioEngine(audioEngine);
+    const result = controller.dispatch({ type: "project/addBar" });
+
+    expect(result.ok).toBe(true);
+    expect(audioEngine.patterns.at(-1)?.barCount).toBe(2);
   });
 });

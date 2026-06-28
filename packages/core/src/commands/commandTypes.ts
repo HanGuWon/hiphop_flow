@@ -9,6 +9,7 @@ export interface CommandError {
     | "BAR_NOT_FOUND"
     | "INVALID_SPLIT"
     | "INVALID_MERGE"
+    | "INVALID_RESIZE"
     | "INVALID_PROJECT"
     | "UNKNOWN_COMMAND";
   message: string;
@@ -27,6 +28,7 @@ export type Command =
   | { type: "lyrics/updateCellText"; cellId: string; text: string }
   | { type: "lyrics/splitCell"; cellId: string; parts: number }
   | { type: "lyrics/mergeCells"; cellIds: string[] }
+  | { type: "lyrics/resizeCellBySteps"; cellId: string; deltaSteps: number }
   | { type: "lyrics/selectCells"; cellIds: string[] }
   | { type: "project/addBar" }
   | { type: "project/removeBar"; barId: string };

@@ -40,9 +40,9 @@ export const DEFAULT_DRUM_CHANNELS = [
   { id: "hihat", name: "HIHAT" }
 ] as const;
 
-export const DEFAULT_DRUM_STEPS_PER_BAR = 16;
+export const DEFAULT_DRUM_STEPS_PER_BAR = 32;
 export const MAX_DRUM_STEPS_PER_BAR = 96;
-export const DRUM_STEP_COUNT_OPTIONS = [16, 24, 32, 48] as const;
+export const DRUM_STEP_COUNT_OPTIONS = [16, 24, 32, 48, 96] as const;
 
 export const isSupportedDrumStepCount = (stepCount: number): boolean =>
   Number.isInteger(stepCount) &&
