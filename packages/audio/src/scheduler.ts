@@ -1,7 +1,8 @@
 import {
-  DEFAULT_STEPS_PER_BAR,
   STEP_TICKS_16,
-  getActiveDrumHitsForRack,
+  getActiveDrumHitsAtTick,
+  getBarTicks,
+  getStepIndexByChannelAtTick,
   type DrumHit,
   type DrumRack
 } from "@hipflow/core";
@@ -9,13 +10,16 @@ import { err, ok, type Result } from "@hipflow/shared";
 import type { CommandError } from "@hipflow/core";
 import type { TransportSnapshot } from "./AudioEngine";
 
+export const TRANSPORT_PULSES_PER_BAR = 96;
+
 export interface StepFrameInput {
   drumRack: DrumRack;
   bpm: number;
   isPlaying: boolean;
   absoluteTick: number;
   barIndex: number;
-  stepIndex16: number;
+  pulseIndex: number;
+  pulsesPerBar: number;
 }
 
 export interface StepFrame {
@@ -26,13 +30,16 @@ export interface StepFrame {
 export interface PlayheadPosition {
   absoluteTick: number;
   barIndex: number;
-  stepIndex16: number;
+  pulseIndex: number;
 }
 
 export const computeStepFrame = (
   input: StepFrameInput
 ): Result<StepFrame, CommandError> => {
-  const hits = getActiveDrumHitsForRack(input.drumRack, input.stepIndex16);
+  const barTicks = getBarTicks();
+  const pulseTicks = barTicks / input.pulsesPerBar;
+  const tickInBar = input.pulseIndex * pulseTicks;
+  const hits = getActiveDrumHitsAtTick(input.drumRack, tickInBar, barTicks);
 
   if (!hits.ok) {
     return err(hits.error);
@@ -44,8 +51,11 @@ export const computeStepFrame = (
       bpm: input.bpm,
       absoluteTick: input.absoluteTick,
       barIndex: input.barIndex,
-      stepIndex16: input.stepIndex16,
-      tickInBar: input.stepIndex16 * STEP_TICKS_16
+      stepIndex16: Math.floor(tickInBar / STEP_TICKS_16),
+      tickInBar,
+      pulseIndex: input.pulseIndex,
+      pulsesPerBar: input.pulsesPerBar,
+      stepIndexByChannel: getStepIndexByChannelAtTick(input.drumRack, tickInBar, barTicks)
     },
     hits: hits.value
   });
@@ -53,30 +63,33 @@ export const computeStepFrame = (
 
 export const advancePlayhead = (
   current: PlayheadPosition,
-  barCount: number
+  barCount: number,
+  pulsesPerBar = TRANSPORT_PULSES_PER_BAR
 ): PlayheadPosition => {
-  const nextStep = (current.stepIndex16 + 1) % DEFAULT_STEPS_PER_BAR;
+  const pulseTicks = getBarTicks() / pulsesPerBar;
+  const nextPulse = (current.pulseIndex + 1) % pulsesPerBar;
   const nextBar =
-    nextStep === 0 ? (current.barIndex + 1) % Math.max(1, barCount) : current.barIndex;
+    nextPulse === 0 ? (current.barIndex + 1) % Math.max(1, barCount) : current.barIndex;
 
   return {
-    absoluteTick: current.absoluteTick + STEP_TICKS_16,
+    absoluteTick: current.absoluteTick + pulseTicks,
     barIndex: nextBar,
-    stepIndex16: nextStep
+    pulseIndex: nextPulse
   };
 };
 
 export const collectHitsForCycle = (drumRack: DrumRack): Result<DrumHit[], CommandError> => {
   const hits: DrumHit[] = [];
 
-  for (let stepIndex = 0; stepIndex < DEFAULT_STEPS_PER_BAR; stepIndex += 1) {
+  for (let pulseIndex = 0; pulseIndex < TRANSPORT_PULSES_PER_BAR; pulseIndex += 1) {
     const frame = computeStepFrame({
       drumRack,
       bpm: 92,
       isPlaying: true,
-      absoluteTick: stepIndex * STEP_TICKS_16,
+      absoluteTick: pulseIndex * (getBarTicks() / TRANSPORT_PULSES_PER_BAR),
       barIndex: 0,
-      stepIndex16: stepIndex
+      pulseIndex,
+      pulsesPerBar: TRANSPORT_PULSES_PER_BAR
     });
 
     if (!frame.ok) {

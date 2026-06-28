@@ -1,3 +1,5 @@
+import { getBarTicks } from "./lyricGrid";
+
 export type StepIndex = number;
 export type DrumChannelName = "KICK" | "SNARE" | "CLAP" | "HIHAT" | string;
 
@@ -38,6 +40,16 @@ export const DEFAULT_DRUM_CHANNELS = [
   { id: "hihat", name: "HIHAT" }
 ] as const;
 
+export const DEFAULT_DRUM_STEPS_PER_BAR = 16;
+export const MAX_DRUM_STEPS_PER_BAR = 96;
+export const DRUM_STEP_COUNT_OPTIONS = [16, 24, 32, 48] as const;
+
+export const isSupportedDrumStepCount = (stepCount: number): boolean =>
+  Number.isInteger(stepCount) &&
+  stepCount > 0 &&
+  stepCount <= MAX_DRUM_STEPS_PER_BAR &&
+  getBarTicks() % stepCount === 0;
+
 export const createDefaultDrumSteps = (stepCount: number): DrumStep[] =>
   Array.from({ length: stepCount }, (_, stepIndex) => ({
     stepIndex,
@@ -45,7 +57,7 @@ export const createDefaultDrumSteps = (stepCount: number): DrumStep[] =>
     velocity: 1
   }));
 
-export const createDefaultDrumRack = (stepCount = 16): DrumRack => ({
+export const createDefaultDrumRack = (stepCount = DEFAULT_DRUM_STEPS_PER_BAR): DrumRack => ({
   channels: DEFAULT_DRUM_CHANNELS.map((channel) => ({
     id: channel.id,
     name: channel.name,

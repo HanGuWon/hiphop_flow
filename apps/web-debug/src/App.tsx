@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { ToneTransportEngine } from "@hipflow/audio";
 import {
+  DRUM_STEP_COUNT_OPTIONS,
   DEFAULT_STEPS_PER_BAR,
   getBarTicks,
   type Bar,
@@ -20,16 +21,25 @@ import "./App.css";
 
 type DispatchCommand = (command: Command) => void;
 
+const DRUM_TIMELINE_COLUMNS = 96;
+const SAMPLE_URLS: Record<string, string> = {
+  kick: "/samples/kick.mp3",
+  snare: "/samples/snare.mp3",
+  clap: "/samples/clap.mp3",
+  hihat: "/samples/hihat.mp3"
+};
+
 interface TransportBarProps {
   snapshot: AppSnapshot;
   onBpmChange: (bpm: number) => void;
   onPlay: () => void;
+  onPause: () => void;
   onStop: () => void;
 }
 
 interface DrumRackProps {
   channels: readonly DrumChannel[];
-  currentStep: number;
+  currentStepsByChannel: Readonly<Record<string, number>>;
   dispatch: DispatchCommand;
 }
 
@@ -49,7 +59,7 @@ interface LyricCellProps {
 const isTextEntryTarget = (target: EventTarget): boolean =>
   target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
 
-const TransportBar = ({ snapshot, onBpmChange, onPlay, onStop }: TransportBarProps) => (
+const TransportBar = ({ snapshot, onBpmChange, onPlay, onPause, onStop }: TransportBarProps) => (
   <header className="transport-bar">
     <div className="brand">HipFlow Studio</div>
     <label className="bpm-control">
@@ -65,6 +75,9 @@ const TransportBar = ({ snapshot, onBpmChange, onPlay, onStop }: TransportBarPro
     <button className="command-button play-button" type="button" onClick={onPlay}>
       Play
     </button>
+    <button className="command-button pause-button" type="button" onClick={onPause}>
+      Pause
+    </button>
     <button className="command-button" type="button" onClick={onStop}>
       Stop
     </button>
@@ -75,17 +88,45 @@ const TransportBar = ({ snapshot, onBpmChange, onPlay, onStop }: TransportBarPro
   </header>
 );
 
-const DrumRack = ({ channels, currentStep, dispatch }: DrumRackProps) => (
+const DrumRack = ({ channels, currentStepsByChannel, dispatch }: DrumRackProps) => (
   <section className="rack-section" aria-label="Drum rack">
     <div className="step-header" aria-hidden="true">
       <span />
-      {Array.from({ length: DEFAULT_STEPS_PER_BAR }, (_, stepIndex) => (
-        <span key={stepIndex}>{stepIndex + 1}</span>
-      ))}
+      <div className="step-number-grid">
+        {Array.from({ length: DEFAULT_STEPS_PER_BAR }, (_, stepIndex) => (
+          <span key={stepIndex} style={{ gridColumn: `span ${DRUM_TIMELINE_COLUMNS / DEFAULT_STEPS_PER_BAR}` }}>
+            {stepIndex + 1}
+          </span>
+        ))}
+      </div>
     </div>
     {channels.map((channel) => (
       <div className="drum-row" key={channel.id}>
-        <div className="channel-label">{channel.name}</div>
+        <div className="channel-meta">
+          <div className="channel-label">{channel.name}</div>
+          {channel.id === "hihat" ? (
+            <label className="resolution-control">
+              <span>Steps</span>
+              <select
+                value={channel.steps.length}
+                onChange={(event) =>
+                  dispatch({
+                    type: "drum/setChannelStepCount",
+                    channelId: channel.id,
+                    stepCount: Number(event.currentTarget.value)
+                  })
+                }
+              >
+                {DRUM_STEP_COUNT_OPTIONS.map((stepCount) => (
+                  <option key={stepCount} value={stepCount}>
+                    {stepCount}
+                    {stepCount === 24 || stepCount === 48 ? " triplet" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+        </div>
         <div className="step-grid">
           {channel.steps.map((step) => (
             <button
@@ -93,11 +134,12 @@ const DrumRack = ({ channels, currentStep, dispatch }: DrumRackProps) => (
               className={[
                 "step-button",
                 step.active ? "is-active" : "",
-                step.stepIndex === currentStep ? "is-current" : ""
+                step.stepIndex === currentStepsByChannel[channel.id] ? "is-current" : ""
               ]
                 .filter(Boolean)
                 .join(" ")}
               key={step.stepIndex}
+              style={{ gridColumn: `span ${DRUM_TIMELINE_COLUMNS / channel.steps.length}` }}
               type="button"
               onClick={() =>
                 dispatch({
@@ -187,11 +229,25 @@ export const App = () => {
   useEffect(() => {
     const audioEngine = new ToneTransportEngine(controller.getSnapshot().project);
     controller.setAudioEngine(audioEngine);
+    let isMounted = true;
+
+    Promise.all(
+      Object.entries(SAMPLE_URLS).map(([channelId, url]) => audioEngine.loadSample(channelId, url))
+    ).catch((sampleError: unknown) => {
+      if (isMounted) {
+        setError(sampleError instanceof Error ? sampleError.message : "Samples could not load.");
+      }
+    });
+
     const unsubscribe = controller.subscribe((nextSnapshot) => {
       setSnapshot(nextSnapshot);
     });
 
-    return unsubscribe;
+    return () => {
+      isMounted = false;
+      audioEngine.stop();
+      unsubscribe();
+    };
   }, [controller]);
 
   const dispatch = useCallback(
@@ -220,6 +276,10 @@ export const App = () => {
     controller.start().catch((playError: unknown) => {
       setError(playError instanceof Error ? playError.message : "Playback could not start.");
     });
+  }, [controller]);
+
+  const handlePause = useCallback(() => {
+    controller.pause();
   }, [controller]);
 
   const handleStop = useCallback(() => {
@@ -255,13 +315,13 @@ export const App = () => {
       if (event.key === " " && !event.ctrlKey && !event.altKey && !event.metaKey) {
         event.preventDefault();
         if (snapshot.transport.isPlaying) {
-          handleStop();
+          handlePause();
         } else {
           handlePlay();
         }
       }
     },
-    [dispatch, handlePlay, handleStop, snapshot]
+    [dispatch, handlePause, handlePlay, snapshot]
   );
 
   const channels = selectDrumChannels(snapshot);
@@ -273,11 +333,12 @@ export const App = () => {
         snapshot={snapshot}
         onBpmChange={handleBpmChange}
         onPlay={handlePlay}
+        onPause={handlePause}
         onStop={handleStop}
       />
       <DrumRack
         channels={channels}
-        currentStep={snapshot.currentStepIndex16}
+        currentStepsByChannel={snapshot.transport.stepIndexByChannel}
         dispatch={dispatch}
       />
       <LyricsGrid bars={bars} dispatch={dispatch} snapshot={snapshot} />

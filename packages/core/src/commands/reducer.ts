@@ -4,6 +4,7 @@ import { validateProject } from "../validation/validateProject";
 import {
   getActiveDrumHitsAtStep,
   muteChannel,
+  setChannelStepCount,
   setDrumVelocity,
   soloChannel,
   toggleDrumStep
@@ -53,6 +54,9 @@ export const applyCommand = (
     case "transport/play":
       return ensureValid(ok({ ...project, transport: { ...project.transport, isPlaying: true } }));
 
+    case "transport/pause":
+      return ensureValid(ok({ ...project, transport: { ...project.transport, isPlaying: false } }));
+
     case "transport/stop":
       return ensureValid(ok({ ...project, transport: { ...project.transport, isPlaying: false } }));
 
@@ -61,6 +65,9 @@ export const applyCommand = (
 
     case "drum/setVelocity":
       return ensureValid(setDrumVelocity(project, command.channelId, command.stepIndex, command.velocity));
+
+    case "drum/setChannelStepCount":
+      return ensureValid(setChannelStepCount(project, command.channelId, command.stepCount));
 
     case "drum/muteChannel":
       return ensureValid(muteChannel(project, command.channelId, command.muted));

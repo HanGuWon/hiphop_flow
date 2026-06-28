@@ -47,7 +47,7 @@ input {
 
 .transport-bar {
   display: grid;
-  grid-template-columns: minmax(160px, 1fr) auto auto auto minmax(180px, auto);
+  grid-template-columns: minmax(160px, 1fr) auto auto auto auto minmax(180px, auto);
   align-items: center;
   gap: 10px;
   min-height: 60px;
@@ -102,6 +102,12 @@ input {
   background: #7ed66a;
 }
 
+.pause-button {
+  color: #101513;
+  border-color: #f0c759;
+  background: #f0c759;
+}
+
 .transport-readout {
   display: inline-flex;
   justify-content: flex-end;
@@ -120,7 +126,7 @@ input {
 .step-header,
 .drum-row {
   display: grid;
-  grid-template-columns: 92px 1fr;
+  grid-template-columns: 132px minmax(0, 1fr);
   gap: 10px;
   align-items: center;
 }
@@ -131,19 +137,28 @@ input {
   font-weight: 700;
 }
 
-.step-header span:not(:first-child) {
+.step-number-grid {
+  display: grid;
+  grid-template-columns: repeat(96, minmax(0, 1fr));
+  gap: 2px;
+}
+
+.step-number-grid span {
   text-align: center;
 }
 
-.step-grid,
-.step-header {
-  grid-template-columns: 92px repeat(16, minmax(24px, 1fr));
+.channel-meta {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
 }
 
 .channel-label {
   display: flex;
   align-items: center;
-  min-height: 34px;
+  min-height: 28px;
   padding: 0 10px;
   border-radius: 6px;
   color: #0e1213;
@@ -152,23 +167,44 @@ input {
   font-weight: 900;
 }
 
-.drum-row:nth-child(2) .channel-label {
+.drum-row:nth-child(3) .channel-label {
   background: #77a7ff;
 }
 
-.drum-row:nth-child(4) .channel-label {
+.drum-row:nth-child(5) .channel-label {
   background: #7ed66a;
+}
+
+.resolution-control {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px;
+  align-items: center;
+  color: #b7c8c2;
+  font-size: 0.66rem;
+  font-weight: 800;
+}
+
+.resolution-control select {
+  min-width: 0;
+  min-height: 26px;
+  border: 1px solid #607074;
+  border-radius: 5px;
+  color: #eef4f2;
+  background: #161b1d;
+  font-size: 0.7rem;
 }
 
 .step-grid {
   display: grid;
-  gap: 6px;
+  grid-template-columns: repeat(96, minmax(0, 1fr));
+  gap: 3px;
 }
 
 .step-button {
   width: 100%;
-  aspect-ratio: 1 / 1;
-  min-width: 24px;
+  min-width: 0;
+  min-height: 30px;
   border: 1px solid #566267;
   border-radius: 5px;
   background: #151b1e;
@@ -280,17 +316,12 @@ input {
 
   .step-header,
   .drum-row {
-    grid-template-columns: 68px 1fr;
+    grid-template-columns: 86px minmax(0, 1fr);
   }
 
   .channel-label {
     padding: 0 6px;
     font-size: 0.7rem;
-  }
-
-  .step-grid,
-  .step-header {
-    grid-template-columns: 68px repeat(16, minmax(20px, 1fr));
   }
 
   .lyric-cells {

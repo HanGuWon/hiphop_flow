@@ -7,6 +7,9 @@ export interface TransportSnapshot {
   barIndex: number;
   stepIndex16: number;
   tickInBar: number;
+  pulseIndex: number;
+  pulsesPerBar: number;
+  stepIndexByChannel: Record<string, number>;
 }
 
 export interface AudioEngine {
@@ -14,6 +17,7 @@ export interface AudioEngine {
   setBpm(bpm: number): void;
   setPattern(pattern: Pattern, drumRack: DrumRack): void;
   play(): Promise<void>;
+  pause(): void;
   stop(): void;
   subscribeToTransport(listener: (snapshot: TransportSnapshot) => void): () => void;
 }

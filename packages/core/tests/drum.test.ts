@@ -3,6 +3,7 @@ import {
   applyCommand,
   createDefaultProject,
   getActiveDrumHitsAtStep,
+  getActiveDrumHitsAtTick,
   muteChannel,
   soloChannel,
   toggleDrumStep
@@ -90,6 +91,41 @@ describe("drum sequencing", () => {
     expect(invalidVelocity.ok).toBe(false);
     if (!invalidVelocity.ok) {
       expect(invalidVelocity.error.code).toBe("INVALID_VELOCITY");
+    }
+  });
+
+  it("supports resizing hi-hat to a 24-step triplet grid", () => {
+    let project = createDefaultProject();
+    const resized = applyCommand(project, {
+      type: "drum/setChannelStepCount",
+      channelId: "hihat",
+      stepCount: 24
+    });
+
+    expect(resized.ok).toBe(true);
+    if (!resized.ok) {
+      return;
+    }
+
+    project = resized.value;
+    expect(project.drumRack.channels.find((channel) => channel.id === "hihat")?.steps).toHaveLength(24);
+
+    const toggled = applyCommand(project, {
+      type: "drum/toggleStep",
+      channelId: "hihat",
+      stepIndex: 23
+    });
+
+    expect(toggled.ok).toBe(true);
+    if (!toggled.ok) {
+      return;
+    }
+
+    const hits = getActiveDrumHitsAtTick(toggled.value.drumRack, 3680);
+    expect(hits.ok).toBe(true);
+    if (hits.ok) {
+      expect(hits.value.map((hit) => hit.channelId)).toEqual(["hihat"]);
+      expect(hits.value[0].stepIndex).toBe(23);
     }
   });
 });

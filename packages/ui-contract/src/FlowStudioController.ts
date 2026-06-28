@@ -18,7 +18,12 @@ const defaultTransportSnapshot = (project: Project): TransportSnapshot => ({
   absoluteTick: 0,
   barIndex: 0,
   stepIndex16: 0,
-  tickInBar: 0
+  tickInBar: 0,
+  pulseIndex: 0,
+  pulsesPerBar: 96,
+  stepIndexByChannel: Object.fromEntries(
+    project.drumRack.channels.map((channel) => [channel.id, 0])
+  )
 });
 
 export class FlowStudioController {
@@ -81,6 +86,11 @@ export class FlowStudioController {
     }
 
     await this.audioEngine?.play();
+  }
+
+  pause(): void {
+    this.audioEngine?.pause();
+    this.dispatch({ type: "transport/pause" });
   }
 
   stop(): void {

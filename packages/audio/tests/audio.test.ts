@@ -48,6 +48,29 @@ describe("@hipflow/audio", () => {
     }
   });
 
+  it("collects triplet hi-hat hits from a 24-step channel", () => {
+    let project = createDefaultProject();
+    project = mustApply(project, {
+      type: "drum/setChannelStepCount",
+      channelId: "hihat",
+      stepCount: 24
+    });
+    [0, 3, 6].forEach((stepIndex) => {
+      project = mustApply(project, { type: "drum/toggleStep", channelId: "hihat", stepIndex });
+    });
+
+    const hits = collectHitsForCycle(project.drumRack);
+
+    expect(hits.ok).toBe(true);
+    if (hits.ok) {
+      expect(hits.value.map((hit) => `${hit.channelId}:${hit.stepIndex}`)).toEqual([
+        "hihat:0",
+        "hihat:3",
+        "hihat:6"
+      ]);
+    }
+  });
+
   it("triggers sample hits when manually advancing the transport", () => {
     let project = createDefaultProject();
     project = mustApply(project, { type: "drum/toggleStep", channelId: "kick", stepIndex: 0 });
@@ -57,5 +80,17 @@ describe("@hipflow/audio", () => {
     engine.advanceOneStepForTest(12.5);
 
     expect(samplePlayer.triggers).toEqual([{ channelId: "kick", time: 12.5, velocity: 1 }]);
+  });
+
+  it("pauses without resetting the playhead", () => {
+    const engine = new ToneTransportEngine();
+    engine.advanceOneStepForTest();
+    const beforePause = engine.getTransportSnapshot();
+
+    engine.pause();
+    const afterPause = engine.getTransportSnapshot();
+
+    expect(afterPause.isPlaying).toBe(false);
+    expect(afterPause.pulseIndex).toBe(beforePause.pulseIndex);
   });
 });

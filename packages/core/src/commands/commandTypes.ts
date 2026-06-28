@@ -2,6 +2,7 @@ export interface CommandError {
   code:
     | "INVALID_BPM"
     | "INVALID_STEP_INDEX"
+    | "INVALID_STEP_COUNT"
     | "INVALID_VELOCITY"
     | "CHANNEL_NOT_FOUND"
     | "CELL_NOT_FOUND"
@@ -16,9 +17,11 @@ export interface CommandError {
 export type Command =
   | { type: "transport/setBpm"; bpm: number }
   | { type: "transport/play" }
+  | { type: "transport/pause" }
   | { type: "transport/stop" }
   | { type: "drum/toggleStep"; channelId: string; stepIndex: number }
   | { type: "drum/setVelocity"; channelId: string; stepIndex: number; velocity: number }
+  | { type: "drum/setChannelStepCount"; channelId: string; stepCount: number }
   | { type: "drum/muteChannel"; channelId: string; muted: boolean }
   | { type: "drum/soloChannel"; channelId: string; solo: boolean }
   | { type: "lyrics/updateCellText"; cellId: string; text: string }

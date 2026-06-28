@@ -1,15 +1,21 @@
 import {
   DEFAULT_BPM,
-  DEFAULT_STEPS_PER_BAR,
   STEP_TICKS_16,
   createDefaultProject,
+  getBarTicks,
+  getStepIndexByChannelAtTick,
   type DrumRack,
   type Pattern,
   type Project
 } from "@hipflow/core";
 import type { AudioEngine, SampleTriggerer, TransportSnapshot } from "./AudioEngine";
 import { SamplePlayer } from "./SamplePlayer";
-import { advancePlayhead, computeStepFrame, type PlayheadPosition } from "./scheduler";
+import {
+  TRANSPORT_PULSES_PER_BAR,
+  advancePlayhead,
+  computeStepFrame,
+  type PlayheadPosition
+} from "./scheduler";
 
 export class ToneTransportEngine implements AudioEngine {
   private tone: typeof import("tone") | undefined;
@@ -23,7 +29,7 @@ export class ToneTransportEngine implements AudioEngine {
   private playhead: PlayheadPosition = {
     absoluteTick: 0,
     barIndex: 0,
-    stepIndex16: 0
+    pulseIndex: 0
   };
   private readonly listeners = new Set<(snapshot: TransportSnapshot) => void>();
 
@@ -47,6 +53,7 @@ export class ToneTransportEngine implements AudioEngine {
 
     if (this.tone) {
       this.tone.Transport.bpm.value = bpm;
+      this.rescheduleToneRepeat();
     }
 
     if (this.isPlaying) {
@@ -70,11 +77,19 @@ export class ToneTransportEngine implements AudioEngine {
     }
 
     this.tone.Transport.bpm.value = this.bpm;
-    this.scheduledEventId = this.tone.Transport.scheduleRepeat((time) => {
-      this.lastToneAdvanceAt = Date.now();
-      this.advanceOneStep(time, true);
-    }, "16n");
+    this.rescheduleToneRepeat();
     this.tone.Transport.start();
+  }
+
+  pause(): void {
+    this.isPlaying = false;
+    this.clearUiHeartbeat();
+
+    if (this.tone) {
+      this.tone.Transport.pause();
+    }
+
+    this.emit(this.currentSnapshot());
   }
 
   stop(): void {
@@ -94,7 +109,7 @@ export class ToneTransportEngine implements AudioEngine {
     this.playhead = {
       absoluteTick: 0,
       barIndex: 0,
-      stepIndex16: 0
+      pulseIndex: 0
     };
     this.emit(this.currentSnapshot());
   }
@@ -122,7 +137,8 @@ export class ToneTransportEngine implements AudioEngine {
       isPlaying: this.isPlaying,
       absoluteTick: this.playhead.absoluteTick,
       barIndex: this.playhead.barIndex,
-      stepIndex16: this.playhead.stepIndex16
+      pulseIndex: this.playhead.pulseIndex,
+      pulsesPerBar: TRANSPORT_PULSES_PER_BAR
     });
 
     if (!frame.ok) {
@@ -136,26 +152,37 @@ export class ToneTransportEngine implements AudioEngine {
     }
 
     this.emit(frame.value.snapshot);
-    this.playhead = advancePlayhead(this.playhead, this.pattern.barCount);
+    this.playhead = advancePlayhead(
+      this.playhead,
+      this.pattern.barCount,
+      TRANSPORT_PULSES_PER_BAR
+    );
 
     return frame.value.snapshot;
   }
 
   private currentSnapshot(): TransportSnapshot {
+    const barTicks = getBarTicks();
+    const pulseTicks = barTicks / TRANSPORT_PULSES_PER_BAR;
+    const tickInBar = this.playhead.pulseIndex * pulseTicks;
+
     return {
       isPlaying: this.isPlaying,
       bpm: this.bpm,
       absoluteTick: this.playhead.absoluteTick,
       barIndex: this.playhead.barIndex,
-      stepIndex16: this.playhead.stepIndex16 % DEFAULT_STEPS_PER_BAR,
-      tickInBar: (this.playhead.stepIndex16 % DEFAULT_STEPS_PER_BAR) * STEP_TICKS_16
+      stepIndex16: Math.floor(tickInBar / STEP_TICKS_16),
+      tickInBar,
+      pulseIndex: this.playhead.pulseIndex,
+      pulsesPerBar: TRANSPORT_PULSES_PER_BAR,
+      stepIndexByChannel: getStepIndexByChannelAtTick(this.drumRack, tickInBar, barTicks)
     };
   }
 
   private startUiHeartbeat(): void {
     this.clearUiHeartbeat();
 
-    const stepMs = Math.max(40, 60_000 / this.bpm / 4);
+    const stepMs = Math.max(16, this.getPulseSeconds() * 1000);
     this.lastToneAdvanceAt = Date.now();
     this.uiHeartbeatId = setInterval(() => {
       if (!this.isPlaying) {
@@ -173,6 +200,25 @@ export class ToneTransportEngine implements AudioEngine {
       clearInterval(this.uiHeartbeatId);
       this.uiHeartbeatId = undefined;
     }
+  }
+
+  private rescheduleToneRepeat(): void {
+    if (!this.tone) {
+      return;
+    }
+
+    if (this.scheduledEventId !== undefined) {
+      this.tone.Transport.clear(this.scheduledEventId);
+    }
+
+    this.scheduledEventId = this.tone.Transport.scheduleRepeat((time) => {
+      this.lastToneAdvanceAt = Date.now();
+      this.advanceOneStep(time, true);
+    }, this.getPulseSeconds());
+  }
+
+  private getPulseSeconds(): number {
+    return (60 / this.bpm) * 4 / TRANSPORT_PULSES_PER_BAR;
   }
 
   private emit(snapshot: TransportSnapshot): void {

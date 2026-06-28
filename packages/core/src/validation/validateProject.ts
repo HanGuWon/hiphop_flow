@@ -1,6 +1,7 @@
 import { err, ok, type Result } from "@hipflow/shared";
-import { DEFAULT_STEPS_PER_BAR, getBarTicks } from "../model/lyricGrid";
+import { getBarTicks } from "../model/lyricGrid";
 import type { Project } from "../model/project";
+import { isSupportedDrumStepCount } from "../model/drum";
 
 export interface ValidationError {
   code: string;
@@ -63,8 +64,13 @@ export const validateProject = (project: Project): Result<void, ValidationError[
   });
 
   project.drumRack.channels.forEach((channel, channelIndex) => {
-    if (channel.steps.length !== DEFAULT_STEPS_PER_BAR) {
-      pushError(errors, `drumRack.channels.${channelIndex}.steps`, "invalid_step_count", "Drum channels must have 16 steps.");
+    if (!isSupportedDrumStepCount(channel.steps.length)) {
+      pushError(
+        errors,
+        `drumRack.channels.${channelIndex}.steps`,
+        "invalid_step_count",
+        "Drum channel step count must divide one 4/4 bar evenly."
+      );
     }
 
     channel.steps.forEach((step, stepIndex) => {
