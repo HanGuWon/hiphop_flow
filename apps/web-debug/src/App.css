@@ -1,0 +1,299 @@
+:root {
+  color: #eef4f2;
+  background: #15181a;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    #15181a;
+  background-size: 48px 48px;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 12px;
+  padding: 14px;
+  outline: none;
+}
+
+.transport-bar,
+.rack-section,
+.lyrics-section,
+.status-strip {
+  border: 1px solid #3c4648;
+  background: #23292b;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+}
+
+.transport-bar {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) auto auto auto minmax(180px, auto);
+  align-items: center;
+  gap: 10px;
+  min-height: 60px;
+  padding: 10px 12px;
+}
+
+.brand {
+  color: #f5f0da;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.bpm-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #b7c8c2;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.bpm-control input {
+  width: 76px;
+  min-height: 36px;
+  border: 1px solid #607074;
+  border-radius: 6px;
+  padding: 0 10px;
+  color: #f5f0da;
+  background: #161b1d;
+}
+
+.command-button {
+  min-width: 72px;
+  min-height: 36px;
+  border: 1px solid #677276;
+  border-radius: 6px;
+  color: #eef4f2;
+  background: #30383b;
+  cursor: pointer;
+}
+
+.command-button:hover,
+.command-button:focus-visible {
+  border-color: #f0c759;
+}
+
+.play-button {
+  color: #101513;
+  border-color: #7ed66a;
+  background: #7ed66a;
+}
+
+.transport-readout {
+  display: inline-flex;
+  justify-content: flex-end;
+  gap: 12px;
+  color: #98d6ff;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.rack-section {
+  display: grid;
+  gap: 8px;
+  padding: 14px 12px;
+}
+
+.step-header,
+.drum-row {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 10px;
+  align-items: center;
+}
+
+.step-header {
+  color: #96a4a7;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.step-header span:not(:first-child) {
+  text-align: center;
+}
+
+.step-grid,
+.step-header {
+  grid-template-columns: 92px repeat(16, minmax(24px, 1fr));
+}
+
+.channel-label {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 6px;
+  color: #0e1213;
+  background: #f0c759;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.drum-row:nth-child(2) .channel-label {
+  background: #77a7ff;
+}
+
+.drum-row:nth-child(4) .channel-label {
+  background: #7ed66a;
+}
+
+.step-grid {
+  display: grid;
+  gap: 6px;
+}
+
+.step-button {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  min-width: 24px;
+  border: 1px solid #566267;
+  border-radius: 5px;
+  background: #151b1e;
+  cursor: pointer;
+}
+
+.step-button:nth-child(4n + 1) {
+  border-color: #7a5651;
+}
+
+.step-button.is-active {
+  background: #f37d25;
+  border-color: #ffb36e;
+}
+
+.step-button.is-current {
+  outline: 3px solid #98d6ff;
+  outline-offset: 1px;
+}
+
+.lyrics-section {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  overflow: auto;
+  padding: 12px;
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  gap: 10px;
+  align-items: stretch;
+  min-height: 54px;
+}
+
+.bar-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #424e51;
+  border-radius: 6px;
+  color: #f5f0da;
+  background: #30383b;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.lyric-cells {
+  display: flex;
+  min-width: 720px;
+  border: 1px solid #3f4a4d;
+  border-right: 0;
+}
+
+.lyric-cell {
+  min-width: 38px;
+  height: 52px;
+  border: 0;
+  border-right: 1px solid #3f4a4d;
+  border-radius: 0;
+  padding: 0 6px;
+  color: #16100c;
+  background: #f37d25;
+  text-align: center;
+  font-weight: 800;
+  outline: none;
+}
+
+.lyric-cell:focus-visible,
+.lyric-cell.is-selected {
+  background: #f0c759;
+  box-shadow: inset 0 0 0 3px #f5f0da;
+}
+
+.lyric-cell.is-current {
+  box-shadow: inset 0 -5px 0 #98d6ff;
+}
+
+.lyric-cell.is-selected.is-current {
+  box-shadow:
+    inset 0 0 0 3px #f5f0da,
+    inset 0 -5px 0 #98d6ff;
+}
+
+.status-strip {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  color: #b7c8c2;
+  font-size: 0.82rem;
+}
+
+@media (max-width: 760px) {
+  .app-shell {
+    padding: 8px;
+  }
+
+  .transport-bar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .brand,
+  .transport-readout {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
+  .step-header,
+  .drum-row {
+    grid-template-columns: 68px 1fr;
+  }
+
+  .channel-label {
+    padding: 0 6px;
+    font-size: 0.7rem;
+  }
+
+  .step-grid,
+  .step-header {
+    grid-template-columns: 68px repeat(16, minmax(20px, 1fr));
+  }
+
+  .lyric-cells {
+    min-width: 620px;
+  }
+}

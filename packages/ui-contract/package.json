@@ -1,0 +1,14 @@
+{
+  "name": "@hipflow/ui-contract",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@hipflow/audio": "workspace:*",
+    "@hipflow/core": "workspace:*",
+    "@hipflow/shared": "workspace:*"
+  }
+}

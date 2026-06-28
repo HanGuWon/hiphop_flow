@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.audit/
+.vite/
+*.local
+
+apps/*/dist/
+apps/*/node_modules/
+packages/*/dist/
+packages/*/node_modules/

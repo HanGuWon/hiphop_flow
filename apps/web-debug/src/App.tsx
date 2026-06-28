@@ -1,0 +1,289 @@
+import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { ToneTransportEngine } from "@hipflow/audio";
+import {
+  DEFAULT_STEPS_PER_BAR,
+  getBarTicks,
+  type Bar,
+  type Command,
+  type DrumChannel,
+  type LyricCell
+} from "@hipflow/core";
+import {
+  FlowStudioController,
+  selectCanMergeSelectedCells,
+  selectCanSplitSelectedCell,
+  selectDrumChannels,
+  selectVisibleBars,
+  type AppSnapshot
+} from "@hipflow/ui-contract";
+import "./App.css";
+
+type DispatchCommand = (command: Command) => void;
+
+interface TransportBarProps {
+  snapshot: AppSnapshot;
+  onBpmChange: (bpm: number) => void;
+  onPlay: () => void;
+  onStop: () => void;
+}
+
+interface DrumRackProps {
+  channels: readonly DrumChannel[];
+  currentStep: number;
+  dispatch: DispatchCommand;
+}
+
+interface LyricsGridProps {
+  bars: readonly Bar[];
+  snapshot: AppSnapshot;
+  dispatch: DispatchCommand;
+}
+
+interface LyricCellProps {
+  bar: Bar;
+  cell: LyricCell;
+  snapshot: AppSnapshot;
+  dispatch: DispatchCommand;
+}
+
+const isTextEntryTarget = (target: EventTarget): boolean =>
+  target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+
+const TransportBar = ({ snapshot, onBpmChange, onPlay, onStop }: TransportBarProps) => (
+  <header className="transport-bar">
+    <div className="brand">HipFlow Studio</div>
+    <label className="bpm-control">
+      <span>BPM</span>
+      <input
+        value={snapshot.project.bpm}
+        min={20}
+        max={300}
+        type="number"
+        onChange={(event) => onBpmChange(Number(event.currentTarget.value))}
+      />
+    </label>
+    <button className="command-button play-button" type="button" onClick={onPlay}>
+      Play
+    </button>
+    <button className="command-button" type="button" onClick={onStop}>
+      Stop
+    </button>
+    <div className="transport-readout">
+      <span>Bar {snapshot.currentBarIndex + 1}</span>
+      <span>Step {snapshot.currentStepIndex16 + 1}/16</span>
+    </div>
+  </header>
+);
+
+const DrumRack = ({ channels, currentStep, dispatch }: DrumRackProps) => (
+  <section className="rack-section" aria-label="Drum rack">
+    <div className="step-header" aria-hidden="true">
+      <span />
+      {Array.from({ length: DEFAULT_STEPS_PER_BAR }, (_, stepIndex) => (
+        <span key={stepIndex}>{stepIndex + 1}</span>
+      ))}
+    </div>
+    {channels.map((channel) => (
+      <div className="drum-row" key={channel.id}>
+        <div className="channel-label">{channel.name}</div>
+        <div className="step-grid">
+          {channel.steps.map((step) => (
+            <button
+              aria-label={`${channel.name} step ${step.stepIndex + 1}`}
+              className={[
+                "step-button",
+                step.active ? "is-active" : "",
+                step.stepIndex === currentStep ? "is-current" : ""
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              key={step.stepIndex}
+              type="button"
+              onClick={() =>
+                dispatch({
+                  type: "drum/toggleStep",
+                  channelId: channel.id,
+                  stepIndex: step.stepIndex
+                })
+              }
+            />
+          ))}
+        </div>
+      </div>
+    ))}
+  </section>
+);
+
+const LyricsGrid = ({ bars, snapshot, dispatch }: LyricsGridProps) => (
+  <section className="lyrics-section" aria-label="Lyrics grid">
+    {bars.map((bar) => (
+      <div className="bar-row" key={bar.id}>
+        <div className="bar-label">Bar {bar.index + 1}</div>
+        <div className="lyric-cells" role="grid" aria-label={`Bar ${bar.index + 1} lyric cells`}>
+          {bar.lyricCells.map((cell) => (
+            <LyricCellView
+              bar={bar}
+              cell={cell}
+              dispatch={dispatch}
+              key={cell.id}
+              snapshot={snapshot}
+            />
+          ))}
+        </div>
+      </div>
+    ))}
+  </section>
+);
+
+const LyricCellView = ({ bar, cell, snapshot, dispatch }: LyricCellProps) => {
+  const isSelected = snapshot.selectedCellIds.includes(cell.id);
+  const isCurrent =
+    bar.index === snapshot.currentBarIndex &&
+    snapshot.currentTickInBar >= cell.startTick &&
+    snapshot.currentTickInBar < cell.startTick + cell.durationTicks;
+  const widthWeight = cell.durationTicks / getBarTicks();
+
+  return (
+    <input
+      aria-label={`Bar ${bar.index + 1} lyric cell at ${cell.startTick}`}
+      className={[
+        "lyric-cell",
+        isSelected ? "is-selected" : "",
+        isCurrent ? "is-current" : ""
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      role="gridcell"
+      style={{ flexGrow: widthWeight, flexBasis: 0 }}
+      value={cell.text}
+      onChange={(event) =>
+        dispatch({
+          type: "lyrics/updateCellText",
+          cellId: cell.id,
+          text: event.currentTarget.value
+        })
+      }
+      onClick={(event) => {
+        const nextSelection = event.ctrlKey
+          ? [...snapshot.selectedCellIds, cell.id]
+          : [cell.id];
+
+        dispatch({ type: "lyrics/selectCells", cellIds: nextSelection });
+      }}
+      onFocus={() => {
+        if (!isSelected) {
+          dispatch({ type: "lyrics/selectCells", cellIds: [cell.id] });
+        }
+      }}
+    />
+  );
+};
+
+export const App = () => {
+  const controller = useMemo(() => new FlowStudioController(), []);
+  const [snapshot, setSnapshot] = useState(() => controller.getSnapshot());
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const audioEngine = new ToneTransportEngine(controller.getSnapshot().project);
+    controller.setAudioEngine(audioEngine);
+    const unsubscribe = controller.subscribe((nextSnapshot) => {
+      setSnapshot(nextSnapshot);
+    });
+
+    return unsubscribe;
+  }, [controller]);
+
+  const dispatch = useCallback(
+    (command: Command) => {
+      const result = controller.dispatch(command);
+
+      if (!result.ok) {
+        setError(result.error.message);
+        return;
+      }
+
+      setError("");
+      setSnapshot(result.value);
+    },
+    [controller]
+  );
+
+  const handleBpmChange = useCallback(
+    (bpm: number) => {
+      dispatch({ type: "transport/setBpm", bpm });
+    },
+    [dispatch]
+  );
+
+  const handlePlay = useCallback(() => {
+    controller.start().catch((playError: unknown) => {
+      setError(playError instanceof Error ? playError.message : "Playback could not start.");
+    });
+  }, [controller]);
+
+  const handleStop = useCallback(() => {
+    controller.stop();
+  }, [controller]);
+
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLElement>) => {
+      if (event.ctrlKey && event.key.toLowerCase() === "m") {
+        event.preventDefault();
+        if (selectCanMergeSelectedCells(snapshot)) {
+          dispatch({ type: "lyrics/mergeCells", cellIds: snapshot.selectedCellIds });
+        }
+      }
+
+      if (event.ctrlKey && event.altKey && ["2", "3", "4"].includes(event.key)) {
+        event.preventDefault();
+        const parts = Number(event.key);
+
+        if (selectCanSplitSelectedCell(snapshot, parts)) {
+          dispatch({
+            type: "lyrics/splitCell",
+            cellId: snapshot.selectedCellIds[0],
+            parts
+          });
+        }
+      }
+
+      if (isTextEntryTarget(event.target) && event.key !== "Escape") {
+        return;
+      }
+
+      if (event.key === " " && !event.ctrlKey && !event.altKey && !event.metaKey) {
+        event.preventDefault();
+        if (snapshot.transport.isPlaying) {
+          handleStop();
+        } else {
+          handlePlay();
+        }
+      }
+    },
+    [dispatch, handlePlay, handleStop, snapshot]
+  );
+
+  const channels = selectDrumChannels(snapshot);
+  const bars = selectVisibleBars(snapshot);
+
+  return (
+    <main className="app-shell" onKeyDown={handleKeyDown} tabIndex={-1}>
+      <TransportBar
+        snapshot={snapshot}
+        onBpmChange={handleBpmChange}
+        onPlay={handlePlay}
+        onStop={handleStop}
+      />
+      <DrumRack
+        channels={channels}
+        currentStep={snapshot.currentStepIndex16}
+        dispatch={dispatch}
+      />
+      <LyricsGrid bars={bars} dispatch={dispatch} snapshot={snapshot} />
+      <footer className="status-strip" aria-live="polite">
+        {error || `${snapshot.project.bars.length} bar / ${snapshot.project.selectedCellIds.length} selected`}
+      </footer>
+    </main>
+  );
+};
