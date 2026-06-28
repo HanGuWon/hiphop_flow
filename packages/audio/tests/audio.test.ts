@@ -82,6 +82,18 @@ describe("@hipflow/audio", () => {
     expect(samplePlayer.triggers).toEqual([{ channelId: "kick", time: 12.5, velocity: 1 }]);
   });
 
+  it("advances one 4/4 bar after 96 transport pulses", () => {
+    let project = createDefaultProject();
+    project = mustApply(project, { type: "project/addBar" });
+    const engine = new ToneTransportEngine(project, new MockSamplePlayer());
+
+    for (let index = 0; index < 96; index += 1) {
+      engine.advanceOneStepForTest();
+    }
+
+    expect(engine.getTransportSnapshot().barIndex).toBe(1);
+  });
+
   it("pauses without resetting the playhead", () => {
     const engine = new ToneTransportEngine();
     engine.advanceOneStepForTest();

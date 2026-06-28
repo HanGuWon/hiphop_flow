@@ -10,7 +10,7 @@ import type { AudioEngine, TransportSnapshot } from "@hipflow/audio";
 import { err, ok, type Result } from "@hipflow/shared";
 import type { AppSnapshot, AppSnapshotListener } from "./events";
 
-const DEFAULT_TRANSPORT_PULSES_PER_BAR = 192;
+const DEFAULT_TRANSPORT_PULSES_PER_BAR = 96;
 const cloneSerializable = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
 const defaultTransportSnapshot = (project: Project): TransportSnapshot => ({

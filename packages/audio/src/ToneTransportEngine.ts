@@ -19,7 +19,7 @@ import {
 
 export class ToneTransportEngine implements AudioEngine {
   private tone: typeof import("tone") | undefined;
-  private scheduledEventId: number | undefined;
+  private audioClockId: ReturnType<typeof setInterval> | undefined;
   private uiHeartbeatId: ReturnType<typeof setInterval> | undefined;
   private lastToneAdvanceAt = 0;
   private bpm = DEFAULT_BPM;
@@ -51,12 +51,8 @@ export class ToneTransportEngine implements AudioEngine {
   setBpm(bpm: number): void {
     this.bpm = bpm;
 
-    if (this.tone) {
-      this.tone.Transport.bpm.value = bpm;
-      this.rescheduleToneRepeat();
-    }
-
     if (this.isPlaying) {
+      this.startAudioClock();
       this.startUiHeartbeat();
     }
   }
@@ -86,22 +82,13 @@ export class ToneTransportEngine implements AudioEngine {
       return;
     }
 
-    if (this.scheduledEventId !== undefined) {
-      this.tone.Transport.clear(this.scheduledEventId);
-    }
-
-    this.tone.Transport.bpm.value = this.bpm;
-    this.rescheduleToneRepeat();
-    this.tone.Transport.start();
+    this.startAudioClock();
   }
 
   pause(): void {
     this.isPlaying = false;
     this.clearUiHeartbeat();
-
-    if (this.tone) {
-      this.tone.Transport.pause();
-    }
+    this.clearAudioClock();
 
     this.emit(this.currentSnapshot());
   }
@@ -109,16 +96,7 @@ export class ToneTransportEngine implements AudioEngine {
   stop(): void {
     this.isPlaying = false;
     this.clearUiHeartbeat();
-
-    if (this.tone) {
-      if (this.scheduledEventId !== undefined) {
-        this.tone.Transport.clear(this.scheduledEventId);
-        this.scheduledEventId = undefined;
-      }
-
-      this.tone.Transport.stop();
-      this.tone.Transport.position = "0:0:0";
-    }
+    this.clearAudioClock();
 
     this.playhead = {
       absoluteTick: 0,
@@ -208,9 +186,7 @@ export class ToneTransportEngine implements AudioEngine {
       }
 
       if (Date.now() - this.lastToneAdvanceAt > stepMs * 1.5) {
-        const tone = this.tone;
-        const canTriggerSamples = tone?.context.state === "running";
-        this.advanceOneStep(canTriggerSamples && tone ? tone.now() : 0, canTriggerSamples);
+        this.advanceOneStep(0, false);
       }
     }, Math.max(30, stepMs / 2));
   }
@@ -222,19 +198,29 @@ export class ToneTransportEngine implements AudioEngine {
     }
   }
 
-  private rescheduleToneRepeat(): void {
+  private startAudioClock(): void {
     if (!this.tone) {
       return;
     }
 
-    if (this.scheduledEventId !== undefined) {
-      this.tone.Transport.clear(this.scheduledEventId);
-    }
+    this.clearAudioClock();
 
-    this.scheduledEventId = this.tone.Transport.scheduleRepeat((time) => {
+    const stepMs = Math.max(1, this.getPulseSeconds() * 1000);
+    this.audioClockId = setInterval(() => {
+      if (!this.isPlaying || !this.tone) {
+        return;
+      }
+
       this.lastToneAdvanceAt = Date.now();
-      this.advanceOneStep(time, true);
-    }, this.getPulseSeconds());
+      this.advanceOneStep(this.tone.now(), true);
+    }, stepMs);
+  }
+
+  private clearAudioClock(): void {
+    if (this.audioClockId !== undefined) {
+      clearInterval(this.audioClockId);
+      this.audioClockId = undefined;
+    }
   }
 
   private getPulseSeconds(): number {

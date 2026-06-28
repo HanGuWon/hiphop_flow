@@ -10,7 +10,7 @@ import { err, ok, type Result } from "@hipflow/shared";
 import type { CommandError } from "@hipflow/core";
 import type { TransportSnapshot } from "./AudioEngine";
 
-export const TRANSPORT_PULSES_PER_BAR = 192;
+export const TRANSPORT_PULSES_PER_BAR = 96;
 
 export interface StepFrameInput {
   drumRack: DrumRack;
