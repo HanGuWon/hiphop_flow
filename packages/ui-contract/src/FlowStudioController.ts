@@ -11,7 +11,14 @@ import { err, ok, type Result } from "@hipflow/shared";
 import type { AppSnapshot, AppSnapshotListener } from "./events";
 
 const DEFAULT_TRANSPORT_PULSES_PER_BAR = 96;
+const MAX_HISTORY_SIZE = 100;
 const cloneSerializable = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+
+const capturesHistory = (command: Command): boolean =>
+  command.type !== "lyrics/selectCells" &&
+  command.type !== "transport/play" &&
+  command.type !== "transport/pause" &&
+  command.type !== "transport/stop";
 
 const defaultTransportSnapshot = (project: Project): TransportSnapshot => ({
   isPlaying: project.transport.isPlaying,
@@ -32,6 +39,8 @@ export class FlowStudioController {
   private transport: TransportSnapshot;
   private audioEngine: AudioEngine | undefined;
   private unsubscribeAudio: (() => void) | undefined;
+  private readonly undoStack: Project[] = [];
+  private readonly redoStack: Project[] = [];
   private readonly listeners = new Set<AppSnapshotListener>();
 
   constructor(initialProject: Project = createDefaultProject()) {
@@ -51,10 +60,16 @@ export class FlowStudioController {
   }
 
   dispatch(command: Command): Result<AppSnapshot, CommandError> {
+    const previousProject = cloneSerializable(this.project);
     const result = applyCommand(this.project, command);
 
     if (!result.ok) {
       return err(result.error);
+    }
+
+    if (capturesHistory(command)) {
+      this.pushUndo(previousProject);
+      this.redoStack.length = 0;
     }
 
     this.project = result.value;
@@ -69,6 +84,48 @@ export class FlowStudioController {
     this.notify(snapshot);
 
     return ok(snapshot);
+  }
+
+  loadProject(project: Project): void {
+    this.audioEngine?.stop();
+    this.project = cloneSerializable(project);
+    this.undoStack.length = 0;
+    this.redoStack.length = 0;
+    this.transport = defaultTransportSnapshot(this.project);
+    this.syncAudioProject();
+    this.notify(this.getSnapshot());
+  }
+
+  undo(): void {
+    const previousProject = this.undoStack.pop();
+
+    if (!previousProject) {
+      return;
+    }
+
+    this.redoStack.push(cloneSerializable(this.project));
+    this.project = cloneSerializable(previousProject);
+    this.syncAfterHistoryChange();
+  }
+
+  redo(): void {
+    const nextProject = this.redoStack.pop();
+
+    if (!nextProject) {
+      return;
+    }
+
+    this.pushUndo(this.project);
+    this.project = cloneSerializable(nextProject);
+    this.syncAfterHistoryChange();
+  }
+
+  canUndo(): boolean {
+    return this.undoStack.length > 0;
+  }
+
+  canRedo(): boolean {
+    return this.redoStack.length > 0;
   }
 
   subscribe(listener: AppSnapshotListener): () => void {
@@ -154,5 +211,23 @@ export class FlowStudioController {
       bpm: this.project.bpm,
       tickInBar: this.transport.stepIndex16 * STEP_TICKS_16
     };
+  }
+
+  private syncAfterHistoryChange(): void {
+    this.syncAudioProject();
+    this.transport = {
+      ...this.transport,
+      bpm: this.project.bpm,
+      isPlaying: this.project.transport.isPlaying
+    };
+    this.notify(this.getSnapshot());
+  }
+
+  private pushUndo(project: Project): void {
+    this.undoStack.push(cloneSerializable(project));
+
+    if (this.undoStack.length > MAX_HISTORY_SIZE) {
+      this.undoStack.shift();
+    }
   }
 }

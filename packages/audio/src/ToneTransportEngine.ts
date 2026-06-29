@@ -14,6 +14,7 @@ import {
   TRANSPORT_PULSES_PER_BAR,
   advancePlayhead,
   computeStepFrame,
+  getPulseSecondsForBpm,
   type PlayheadPosition
 } from "./scheduler";
 
@@ -224,7 +225,7 @@ export class ToneTransportEngine implements AudioEngine {
   }
 
   private getPulseSeconds(): number {
-    return (60 / this.bpm) * 4 / TRANSPORT_PULSES_PER_BAR;
+    return getPulseSecondsForBpm(this.bpm, TRANSPORT_PULSES_PER_BAR);
   }
 
   private emit(snapshot: TransportSnapshot): void {

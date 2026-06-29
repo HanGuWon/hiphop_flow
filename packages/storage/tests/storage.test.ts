@@ -1,6 +1,11 @@
 import "fake-indexeddb/auto";
 import { describe, expect, it } from "vitest";
-import { STEP_TICKS_DEFAULT, createDefaultProject } from "@hipflow/core";
+import {
+  DEFAULT_STEPS_PER_BAR,
+  STEP_TICKS_DEFAULT,
+  createDefaultProject,
+  getBarTicks
+} from "@hipflow/core";
 import { DexieProjectRepository, exportProjectToJson, importProjectFromJson } from "../src";
 
 describe("@hipflow/storage", () => {
@@ -12,6 +17,13 @@ describe("@hipflow/storage", () => {
     expect(imported.ok).toBe(true);
     if (imported.ok) {
       expect(imported.value.bars[0].lyricCells[0].durationTicks).toBe(STEP_TICKS_DEFAULT);
+      expect(imported.value.bars[0].lyricCells).toHaveLength(DEFAULT_STEPS_PER_BAR);
+      expect(
+        imported.value.bars[0].lyricCells.reduce(
+          (total, cell) => total + cell.durationTicks,
+          0
+        )
+      ).toBe(getBarTicks());
       expect(imported.value).toEqual(project);
     }
   });
