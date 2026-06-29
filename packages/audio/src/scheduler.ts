@@ -12,6 +12,11 @@ import type { TransportSnapshot } from "./AudioEngine";
 
 export const TRANSPORT_PULSES_PER_BAR = 96;
 
+export const getPulseSecondsForBpm = (
+  bpm: number,
+  pulsesPerBar = TRANSPORT_PULSES_PER_BAR
+): number => (60 / bpm) * 4 / pulsesPerBar;
+
 export interface StepFrameInput {
   drumRack: DrumRack;
   bpm: number;

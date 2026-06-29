@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { applyCommand, createDefaultProject, type Project } from "@hipflow/core";
-import { collectHitsForCycle, ToneTransportEngine, type SampleTriggerer } from "../src";
+import {
+  TRANSPORT_PULSES_PER_BAR,
+  collectHitsForCycle,
+  getPulseSecondsForBpm,
+  ToneTransportEngine,
+  type SampleTriggerer
+} from "../src";
 
 class MockSamplePlayer implements SampleTriggerer {
   readonly triggers: Array<{ channelId: string; time: number; velocity: number }> = [];
@@ -92,6 +98,12 @@ describe("@hipflow/audio", () => {
     }
 
     expect(engine.getTransportSnapshot().barIndex).toBe(1);
+  });
+
+  it("calculates BPM pulse duration without doubling playback speed", () => {
+    const secondsPerPulse = getPulseSecondsForBpm(120);
+
+    expect(secondsPerPulse * TRANSPORT_PULSES_PER_BAR).toBeCloseTo(2);
   });
 
   it("pauses without resetting the playhead", () => {

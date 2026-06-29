@@ -51,6 +51,9 @@ importers:
       '@hipflow/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@hipflow/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
       '@hipflow/ui-contract':
         specifier: workspace:*
         version: link:../../packages/ui-contract
