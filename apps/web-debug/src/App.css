@@ -68,12 +68,19 @@ select {
 }
 
 .bpm-control {
-  display: inline-flex;
+  display: inline-grid;
+  grid-template-columns: auto auto;
   align-items: center;
   gap: 8px;
   color: #b7c8c2;
   font-size: 0.85rem;
   font-weight: 700;
+}
+
+.bpm-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .bpm-control input {
@@ -84,6 +91,18 @@ select {
   padding: 0 10px;
   color: #f5f0da;
   background: #161b1d;
+}
+
+.bpm-set-button {
+  min-width: 46px;
+  min-height: 36px;
+  border: 1px solid #607074;
+  border-radius: 6px;
+  color: #eef4f2;
+  background: #30383b;
+  font-size: 0.76rem;
+  font-weight: 900;
+  cursor: pointer;
 }
 
 .command-button {
@@ -98,7 +117,8 @@ select {
 
 .command-button:disabled,
 .tool-button:disabled,
-.mini-toggle:disabled {
+.mini-toggle:disabled,
+.bpm-set-button:disabled {
   color: #6f7b7e;
   border-color: #3c4648;
   background: #202628;
@@ -110,7 +130,9 @@ select {
 .tool-button:hover,
 .tool-button:focus-visible,
 .mini-toggle:hover,
-.mini-toggle:focus-visible {
+.mini-toggle:focus-visible,
+.bpm-set-button:hover,
+.bpm-set-button:focus-visible {
   border-color: #f0c759;
 }
 
@@ -119,7 +141,9 @@ select {
 .tool-button:disabled:hover,
 .tool-button:disabled:focus-visible,
 .mini-toggle:disabled:hover,
-.mini-toggle:disabled:focus-visible {
+.mini-toggle:disabled:focus-visible,
+.bpm-set-button:disabled:hover,
+.bpm-set-button:disabled:focus-visible {
   border-color: #3c4648;
 }
 
