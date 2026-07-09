@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type FormEvent,
   type KeyboardEvent
 } from "react";
 import { ToneTransportEngine } from "@hipflow/audio";
@@ -194,66 +195,110 @@ const TransportBar = ({
   storageState,
   canUndo,
   canRedo
-}: TransportBarProps) => (
-  <header className="transport-bar">
-    <div className="brand">HipFlow Studio</div>
-    <label className="bpm-control">
-      <span>BPM</span>
-      <input
-        value={snapshot.project.bpm}
-        min={20}
-        max={300}
-        type="number"
-        onChange={(event) => onBpmChange(Number(event.currentTarget.value))}
-      />
-    </label>
-    <div className="button-group transport-actions" aria-label="Transport controls">
-      <button
-        className="command-button play-button"
-        disabled={!samplesReady}
-        title={samplesReady ? "Play" : "Samples loading"}
-        type="button"
-        onClick={onPlay}
-      >
-        Play
-      </button>
-      <button className="command-button pause-button" type="button" onClick={onPause}>
-        Pause
-      </button>
-      <button className="command-button" type="button" onClick={onStop}>
-        Stop
-      </button>
-    </div>
-    <div className="button-group edit-actions" aria-label="Edit history controls">
-      <button className="command-button" disabled={!canUndo} type="button" onClick={onUndo}>
-        Undo
-      </button>
-      <button className="command-button" disabled={!canRedo} type="button" onClick={onRedo}>
-        Redo
-      </button>
-    </div>
-    <div className="button-group project-actions" aria-label="Project storage controls">
-      <button className="command-button" type="button" onClick={onSaveProject}>
-        Save
-      </button>
-      <button className="command-button" type="button" onClick={onLoadLatestProject}>
-        Load
-      </button>
-      <button className="command-button" type="button" onClick={onExportJson}>
-        Export
-      </button>
-      <button className="command-button" type="button" onClick={onChooseImportJson}>
-        Import
-      </button>
-    </div>
-    <div className="transport-readout">
-      <span>Bar {snapshot.currentBarIndex + 1}</span>
-      <span>Cell {getDefaultGridStepIndex(snapshot.currentTickInBar) + 1}/{DEFAULT_STEPS_PER_BAR}</span>
-      <span className={`state-pill is-${sampleLoadState}`}>{getSampleLabel(sampleLoadState)}</span>
-      <span className={`state-pill is-${storageState}`}>{getStorageLabel(storageState)}</span>
-    </div>
-  </header>
-);
+}: TransportBarProps) => {
+  const [bpmDraft, setBpmDraft] = useState(String(snapshot.project.bpm));
+  const parsedBpm = Number(bpmDraft);
+  const canCommitBpm =
+    bpmDraft.trim().length > 0 &&
+    Number.isFinite(parsedBpm) &&
+    parsedBpm >= 20 &&
+    parsedBpm <= 300;
+
+  useEffect(() => {
+    setBpmDraft(String(snapshot.project.bpm));
+  }, [snapshot.project.bpm]);
+
+  const commitBpm = () => {
+    if (canCommitBpm) {
+      if (parsedBpm !== snapshot.project.bpm) {
+        onBpmChange(parsedBpm);
+      }
+      return;
+    }
+
+    setBpmDraft(String(snapshot.project.bpm));
+  };
+
+  const handleBpmSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    commitBpm();
+  };
+
+  return (
+    <header className="transport-bar">
+      <div className="brand">HipFlow Studio</div>
+      <form className="bpm-control" onSubmit={handleBpmSubmit}>
+        <label className="bpm-field">
+          <span>BPM</span>
+          <input
+            aria-label="BPM"
+            value={bpmDraft}
+            inputMode="decimal"
+            max={300}
+            min={20}
+            step={1}
+            type="number"
+            onBlur={commitBpm}
+            onChange={(event) => setBpmDraft(event.currentTarget.value)}
+          />
+        </label>
+        <button
+          className="bpm-set-button"
+          disabled={!canCommitBpm}
+          type="submit"
+          onMouseDown={(event) => event.preventDefault()}
+        >
+          Set
+        </button>
+      </form>
+      <div className="button-group transport-actions" aria-label="Transport controls">
+        <button
+          className="command-button play-button"
+          disabled={!samplesReady}
+          title={samplesReady ? "Play" : "Samples loading"}
+          type="button"
+          onClick={onPlay}
+        >
+          Play
+        </button>
+        <button className="command-button pause-button" type="button" onClick={onPause}>
+          Pause
+        </button>
+        <button className="command-button" type="button" onClick={onStop}>
+          Stop
+        </button>
+      </div>
+      <div className="button-group edit-actions" aria-label="Edit history controls">
+        <button className="command-button" disabled={!canUndo} type="button" onClick={onUndo}>
+          Undo
+        </button>
+        <button className="command-button" disabled={!canRedo} type="button" onClick={onRedo}>
+          Redo
+        </button>
+      </div>
+      <div className="button-group project-actions" aria-label="Project storage controls">
+        <button className="command-button" type="button" onClick={onSaveProject}>
+          Save
+        </button>
+        <button className="command-button" type="button" onClick={onLoadLatestProject}>
+          Load
+        </button>
+        <button className="command-button" type="button" onClick={onExportJson}>
+          Export
+        </button>
+        <button className="command-button" type="button" onClick={onChooseImportJson}>
+          Import
+        </button>
+      </div>
+      <div className="transport-readout">
+        <span>Bar {snapshot.currentBarIndex + 1}</span>
+        <span>Cell {getDefaultGridStepIndex(snapshot.currentTickInBar) + 1}/{DEFAULT_STEPS_PER_BAR}</span>
+        <span className={`state-pill is-${sampleLoadState}`}>{getSampleLabel(sampleLoadState)}</span>
+        <span className={`state-pill is-${storageState}`}>{getStorageLabel(storageState)}</span>
+      </div>
+    </header>
+  );
+};
 
 const DrumRack = ({
   channels,
