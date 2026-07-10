@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { AudioEngine, TransportSnapshot } from "@hipflow/audio";
 import { createDefaultProject, type DrumRack, type Pattern } from "@hipflow/core";
-import { FlowStudioController, selectCanSplitSelectedCell, selectDrumChannels } from "../src";
+import {
+  FlowStudioController,
+  selectCanSplitSelectedCell,
+  selectDrumChannels,
+  selectLyricCellNavigationTarget,
+  selectLyricCellRange
+} from "../src";
 
 class MockAudioEngine implements AudioEngine {
   readonly patterns: Pattern[] = [];
@@ -178,5 +184,39 @@ describe("@hipflow/ui-contract", () => {
     expect(controller.canUndo()).toBe(false);
     expect(controller.canRedo()).toBe(false);
     expect(audioEngine.bpms.at(-1)).toBe(128);
+  });
+
+  it("navigates lyric cells across rows and selects contiguous ranges", () => {
+    const controller = new FlowStudioController();
+
+    controller.dispatch({ type: "project/addBar" });
+    const snapshot = controller.getSnapshot();
+    const firstBar = snapshot.project.bars[0];
+    const secondBar = snapshot.project.bars[1];
+    const firstCellId = firstBar.lyricCells[0].id;
+    const thirdCellId = firstBar.lyricCells[2].id;
+    const lastCellId = firstBar.lyricCells.at(-1)?.id;
+
+    expect(selectLyricCellNavigationTarget(snapshot, firstCellId, "previous")).toBeUndefined();
+    expect(selectLyricCellNavigationTarget(snapshot, firstCellId, "next")).toBe(
+      firstBar.lyricCells[1].id
+    );
+    expect(selectLyricCellNavigationTarget(snapshot, firstCellId, "down")).toBe(
+      secondBar.lyricCells[0].id
+    );
+    expect(lastCellId).toBeDefined();
+
+    if (lastCellId) {
+      expect(selectLyricCellNavigationTarget(snapshot, lastCellId, "next")).toBe(
+        secondBar.lyricCells[0].id
+      );
+    }
+
+    expect(selectLyricCellRange(snapshot, thirdCellId, firstCellId)).toEqual(
+      firstBar.lyricCells.slice(0, 3).map((cell) => cell.id)
+    );
+    expect(selectLyricCellRange(snapshot, firstCellId, secondBar.lyricCells[0].id)).toEqual([
+      secondBar.lyricCells[0].id
+    ]);
   });
 });

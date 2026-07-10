@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm --filter @hipflow/web-debug dev",
+    "desktop:start": "pnpm --filter @hipflow/desktop open",
+    "desktop:build": "pnpm --filter @hipflow/desktop build",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.base.json --noEmit"
   },

@@ -91,6 +91,16 @@ export const applyCommand = (
     case "lyrics/selectCells":
       return ensureValid(selectCells(project, command.cellIds));
 
+    case "project/setTitle": {
+      const title = command.title.trim();
+
+      if (title.length === 0 || title.length > 80) {
+        return err(commandError("INVALID_TITLE", "Project title must be between 1 and 80 characters."));
+      }
+
+      return ensureValid(ok({ ...project, title }));
+    }
+
     case "project/addBar":
       return ensureValid(addBar(project));
 

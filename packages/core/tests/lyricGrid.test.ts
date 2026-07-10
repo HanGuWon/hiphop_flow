@@ -162,4 +162,29 @@ describe("lyric grid commands", () => {
       }
     }
   });
+
+  it("sets a trimmed project title and rejects empty titles", () => {
+    const project = createDefaultProject();
+    const renamed = applyCommand(project, {
+      type: "project/setTitle",
+      title: "  Midnight Draft  "
+    });
+
+    expect(renamed.ok).toBe(true);
+    if (!renamed.ok) {
+      return;
+    }
+
+    expect(renamed.value.title).toBe("Midnight Draft");
+
+    const invalid = applyCommand(renamed.value, {
+      type: "project/setTitle",
+      title: "   "
+    });
+
+    expect(invalid.ok).toBe(false);
+    if (!invalid.ok) {
+      expect(invalid.error.code).toBe("INVALID_TITLE");
+    }
+  });
 });
