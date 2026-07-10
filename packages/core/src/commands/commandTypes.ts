@@ -4,6 +4,7 @@ export interface CommandError {
     | "INVALID_STEP_INDEX"
     | "INVALID_STEP_COUNT"
     | "INVALID_VELOCITY"
+    | "INVALID_TITLE"
     | "CHANNEL_NOT_FOUND"
     | "CELL_NOT_FOUND"
     | "BAR_NOT_FOUND"
@@ -30,6 +31,7 @@ export type Command =
   | { type: "lyrics/mergeCells"; cellIds: string[] }
   | { type: "lyrics/resizeCellBySteps"; cellId: string; deltaSteps: number }
   | { type: "lyrics/selectCells"; cellIds: string[] }
+  | { type: "project/setTitle"; title: string }
   | { type: "project/addBar" }
   | { type: "project/removeBar"; barId: string };
 

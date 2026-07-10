@@ -1,0 +1,65 @@
+{
+  "name": "@hipflow/desktop",
+  "version": "0.1.0",
+  "description": "Desktop shell for HipFlow Studio",
+  "author": "HipFlow Studio",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "open": "pnpm run build:web && electron .",
+    "build:web": "pnpm --filter @hipflow/web-debug build",
+    "build": "pnpm run build:web && electron-builder --win --x64",
+    "pack": "pnpm run build:web && electron-builder --dir --win --x64"
+  },
+  "devDependencies": {
+    "electron": "43.1.0",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "io.hipflow.studio",
+    "productName": "HipFlow Studio",
+    "asar": true,
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.cjs",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../web-debug/dist",
+        "to": "web"
+      }
+    ],
+    "win": {
+      "icon": "../web-debug/public/favicon.svg",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "artifactName": "HipFlow-Studio-Setup-${version}-${arch}.${ext}",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "runAfterFinish": true
+    },
+    "portable": {
+      "artifactName": "HipFlow-Studio-Portable-${version}-${arch}.${ext}"
+    }
+  }
+}

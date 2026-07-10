@@ -1,6 +1,8 @@
 node_modules/
 dist/
 .audit/
+.playwright-cli/
+output/
 .vite/
 *.local
 

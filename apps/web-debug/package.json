@@ -13,6 +13,7 @@
     "@hipflow/core": "workspace:*",
     "@hipflow/storage": "workspace:*",
     "@hipflow/ui-contract": "workspace:*",
+    "lucide-react": "0.468.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3"
   },

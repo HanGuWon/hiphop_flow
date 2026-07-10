@@ -8,16 +8,7 @@ import {
   type KeyboardEvent
 } from "react";
 import { ToneTransportEngine } from "@hipflow/audio";
-import {
-  DRUM_STEP_COUNT_OPTIONS,
-  DEFAULT_STEPS_PER_BAR,
-  STEP_TICKS_DEFAULT,
-  getBarTicks,
-  type Bar,
-  type Command,
-  type DrumChannel,
-  type LyricCell
-} from "@hipflow/core";
+import type { Command } from "@hipflow/core";
 import {
   DexieProjectRepository,
   exportProjectToJson,
@@ -26,85 +17,36 @@ import {
 import {
   FlowStudioController,
   selectCanMergeSelectedCells,
-  selectCanResizeSelectedCell,
   selectCanSplitSelectedCell,
   selectDrumChannels,
   selectVisibleBars,
   type AppSnapshot
 } from "@hipflow/ui-contract";
+import { DrumRack, type SelectedDrumStep } from "./components/DrumRack";
+import { LyricsGrid } from "./components/LyricsGrid";
+import {
+  TransportBar,
+  getSampleLabel,
+  getStorageLabel,
+  type SampleLoadState,
+  type StorageState
+} from "./components/TransportBar";
 import "./App.css";
 
-type DispatchCommand = (command: Command) => void;
-type SampleLoadState = "loading" | "ready" | "error";
-type StorageState = "idle" | "loading" | "dirty" | "saving" | "saved" | "error";
-
-interface SelectedDrumStep {
-  channelId: string;
-  stepIndex: number;
-}
-
-const DRUM_TIMELINE_COLUMNS = 192;
 const TARGET_LYRIC_BAR_COUNT = 8;
 const AUTOSAVE_DELAY_MS = 600;
-const SAMPLE_URLS: Record<string, string> = {
-  kick: "/samples/kick.mp3",
-  snare: "/samples/snare.mp3",
-  clap: "/samples/clap.mp3",
-  hihat: "/samples/hihat.mp3"
+const SAMPLE_FILES: Record<string, string> = {
+  kick: "kick.mp3",
+  snare: "snare.mp3",
+  clap: "clap.mp3",
+  hihat: "hihat.mp3"
 };
 
-interface TransportBarProps {
-  snapshot: AppSnapshot;
-  onBpmChange: (bpm: number) => void;
-  onPlay: () => void;
-  onPause: () => void;
-  onStop: () => void;
-  onUndo: () => void;
-  onRedo: () => void;
-  onSaveProject: () => void;
-  onLoadLatestProject: () => void;
-  onExportJson: () => void;
-  onChooseImportJson: () => void;
-  samplesReady: boolean;
-  sampleLoadState: SampleLoadState;
-  storageState: StorageState;
-  canUndo: boolean;
-  canRedo: boolean;
-}
-
-interface DrumRackProps {
-  channels: readonly DrumChannel[];
-  currentStepsByChannel: Readonly<Record<string, number>>;
-  dispatch: DispatchCommand;
-  selectedDrumStep: SelectedDrumStep | undefined;
-  onSelectDrumStep: (step: SelectedDrumStep) => void;
-}
-
-interface LyricsGridProps {
-  bars: readonly Bar[];
-  snapshot: AppSnapshot;
-  dispatch: DispatchCommand;
-  canGrowSelectedCell: boolean;
-  canShrinkSelectedCell: boolean;
-  canMergeSelectedCells: boolean;
-  canSplitSelectedCell: (parts: number) => boolean;
-  onAddBar: () => void;
-  onRemoveLastBar: () => void;
-  onSetEightBars: () => void;
-}
-
-interface LyricCellProps {
-  bar: Bar;
-  cell: LyricCell;
-  snapshot: AppSnapshot;
-  dispatch: DispatchCommand;
-}
-
 const isTextEntryTarget = (target: EventTarget): boolean =>
-  target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
-
-const getDefaultGridStepIndex = (tickInBar: number): number =>
-  Math.min(DEFAULT_STEPS_PER_BAR - 1, Math.floor(tickInBar / STEP_TICKS_DEFAULT));
+  target instanceof HTMLInputElement ||
+  target instanceof HTMLTextAreaElement ||
+  target instanceof HTMLSelectElement ||
+  (target instanceof HTMLElement && target.isContentEditable);
 
 const commandAffectsSavedProject = (command: Command): boolean =>
   command.type !== "lyrics/selectCells" &&
@@ -112,469 +54,29 @@ const commandAffectsSavedProject = (command: Command): boolean =>
   command.type !== "transport/pause" &&
   command.type !== "transport/stop";
 
-const findSelectedLyricCell = (
-  bars: readonly Bar[],
-  selectedCellIds: readonly string[]
-): LyricCell | undefined => {
-  if (selectedCellIds.length !== 1) {
-    return undefined;
-  }
-
-  return bars
-    .flatMap((bar) => bar.lyricCells)
-    .find((cell) => cell.id === selectedCellIds[0]);
-};
-
-const describeSelectedCell = (
-  bars: readonly Bar[],
-  selectedCellIds: readonly string[]
-): string => {
-  const selectedCell = findSelectedLyricCell(bars, selectedCellIds);
-
-  if (!selectedCell) {
-    return `${selectedCellIds.length} selected`;
-  }
-
-  const cellUnits = selectedCell.durationTicks / STEP_TICKS_DEFAULT;
-
-  return `${cellUnits.toFixed(2)} cells / ${selectedCell.durationTicks} ticks`;
-};
-
-const getStorageLabel = (state: StorageState): string => {
-  switch (state) {
-    case "loading":
-      return "Loading project";
-    case "dirty":
-      return "Unsaved changes";
-    case "saving":
-      return "Saving";
-    case "saved":
-      return "Saved";
-    case "error":
-      return "Storage error";
-    case "idle":
-      return "No saved project";
-  }
-};
-
-const getSampleLabel = (state: SampleLoadState): string => {
-  switch (state) {
-    case "ready":
-      return "Samples ready";
-    case "error":
-      return "Sample error";
-    case "loading":
-      return "Samples loading";
-  }
-};
-
-const formatBarCount = (count: number, unit = "Bar"): string =>
-  `${count} ${unit}${count === 1 ? "" : "s"}`;
-
 const safeDownloadName = (title: string): string => {
   const baseName = title.trim().replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "");
 
   return `${baseName || "hipflow-project"}.json`;
 };
 
-const TransportBar = ({
-  snapshot,
-  onBpmChange,
-  onPlay,
-  onPause,
-  onStop,
-  onUndo,
-  onRedo,
-  onSaveProject,
-  onLoadLatestProject,
-  onExportJson,
-  onChooseImportJson,
-  samplesReady,
-  sampleLoadState,
-  storageState,
-  canUndo,
-  canRedo
-}: TransportBarProps) => (
-  <header className="transport-bar">
-    <div className="brand">HipFlow Studio</div>
-    <label className="bpm-control">
-      <span>BPM</span>
-      <input
-        value={snapshot.project.bpm}
-        min={20}
-        max={300}
-        type="number"
-        onChange={(event) => onBpmChange(Number(event.currentTarget.value))}
-      />
-    </label>
-    <div className="button-group transport-actions" aria-label="Transport controls">
-      <button
-        className="command-button play-button"
-        disabled={!samplesReady}
-        title={samplesReady ? "Play" : "Samples loading"}
-        type="button"
-        onClick={onPlay}
-      >
-        Play
-      </button>
-      <button className="command-button pause-button" type="button" onClick={onPause}>
-        Pause
-      </button>
-      <button className="command-button" type="button" onClick={onStop}>
-        Stop
-      </button>
-    </div>
-    <div className="button-group edit-actions" aria-label="Edit history controls">
-      <button className="command-button" disabled={!canUndo} type="button" onClick={onUndo}>
-        Undo
-      </button>
-      <button className="command-button" disabled={!canRedo} type="button" onClick={onRedo}>
-        Redo
-      </button>
-    </div>
-    <div className="button-group project-actions" aria-label="Project storage controls">
-      <button className="command-button" type="button" onClick={onSaveProject}>
-        Save
-      </button>
-      <button className="command-button" type="button" onClick={onLoadLatestProject}>
-        Load
-      </button>
-      <button className="command-button" type="button" onClick={onExportJson}>
-        Export
-      </button>
-      <button className="command-button" type="button" onClick={onChooseImportJson}>
-        Import
-      </button>
-    </div>
-    <div className="transport-readout">
-      <span>Bar {snapshot.currentBarIndex + 1}</span>
-      <span>Cell {getDefaultGridStepIndex(snapshot.currentTickInBar) + 1}/{DEFAULT_STEPS_PER_BAR}</span>
-      <span className={`state-pill is-${sampleLoadState}`}>{getSampleLabel(sampleLoadState)}</span>
-      <span className={`state-pill is-${storageState}`}>{getStorageLabel(storageState)}</span>
-    </div>
-  </header>
-);
-
-const DrumRack = ({
-  channels,
-  currentStepsByChannel,
-  dispatch,
-  selectedDrumStep,
-  onSelectDrumStep
-}: DrumRackProps) => {
-  const selectedChannel = channels.find((channel) => channel.id === selectedDrumStep?.channelId);
-  const selectedStep = selectedChannel?.steps.find(
-    (step) => step.stepIndex === selectedDrumStep?.stepIndex
+const getSampleUrls = (): Readonly<Record<string, string>> =>
+  Object.fromEntries(
+    Object.entries(SAMPLE_FILES).map(([channelId, fileName]) => [
+      channelId,
+      new URL(`./samples/${fileName}`, document.baseURI).toString()
+    ])
   );
 
-  return (
-    <section className="rack-section" aria-label="Drum rack">
-      <div className="step-header" aria-hidden="true">
-        <span />
-        <div className="step-number-grid">
-          {Array.from({ length: DEFAULT_STEPS_PER_BAR }, (_, stepIndex) => (
-            <span key={stepIndex} style={{ gridColumn: `span ${DRUM_TIMELINE_COLUMNS / DEFAULT_STEPS_PER_BAR}` }}>
-              {stepIndex + 1}
-            </span>
-          ))}
-        </div>
-      </div>
-      {channels.map((channel) => (
-        <div className="drum-row" key={channel.id}>
-          <div className="channel-meta">
-            <div className="channel-label-row">
-              <div className="channel-label">{channel.name}</div>
-              <button
-                aria-pressed={channel.muted}
-                className={["mini-toggle", channel.muted ? "is-on" : ""].filter(Boolean).join(" ")}
-                title="Mute channel"
-                type="button"
-                onClick={() =>
-                  dispatch({
-                    type: "drum/muteChannel",
-                    channelId: channel.id,
-                    muted: !channel.muted
-                  })
-                }
-              >
-                M
-              </button>
-              <button
-                aria-pressed={channel.solo}
-                className={["mini-toggle", channel.solo ? "is-on" : ""].filter(Boolean).join(" ")}
-                title="Solo channel"
-                type="button"
-                onClick={() =>
-                  dispatch({
-                    type: "drum/soloChannel",
-                    channelId: channel.id,
-                    solo: !channel.solo
-                  })
-                }
-              >
-                S
-              </button>
-            </div>
-            {channel.id === "hihat" ? (
-              <label className="resolution-control">
-                <span>Steps</span>
-                <select
-                  value={channel.steps.length}
-                  onChange={(event) =>
-                    dispatch({
-                      type: "drum/setChannelStepCount",
-                      channelId: channel.id,
-                      stepCount: Number(event.currentTarget.value)
-                    })
-                  }
-                >
-                  {DRUM_STEP_COUNT_OPTIONS.map((stepCount) => (
-                    <option key={stepCount} value={stepCount}>
-                      {stepCount}
-                      {stepCount === 24 || stepCount === 48 ? " triplet" : ""}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
-          </div>
-          <div className="step-grid">
-            {channel.steps.map((step) => (
-              <button
-                aria-label={`${channel.name} step ${step.stepIndex + 1}`}
-                aria-pressed={step.active}
-                className={[
-                  "step-button",
-                  step.active ? "is-active" : "",
-                  step.stepIndex === currentStepsByChannel[channel.id] ? "is-current" : "",
-                  selectedDrumStep?.channelId === channel.id &&
-                  selectedDrumStep.stepIndex === step.stepIndex
-                    ? "is-selected"
-                    : ""
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                key={step.stepIndex}
-                style={{ gridColumn: `span ${DRUM_TIMELINE_COLUMNS / channel.steps.length}` }}
-                title={`${channel.name} ${step.stepIndex + 1} velocity ${Math.round(step.velocity * 100)}%`}
-                type="button"
-                onClick={() => {
-                  onSelectDrumStep({ channelId: channel.id, stepIndex: step.stepIndex });
-                  dispatch({
-                    type: "drum/toggleStep",
-                    channelId: channel.id,
-                    stepIndex: step.stepIndex
-                  });
-                }}
-              />
-            ))}
-          </div>
-        </div>
-      ))}
-      <div className="step-editor">
-        <div className="step-editor-label">
-          {selectedChannel && selectedStep
-            ? `${selectedChannel.name} ${selectedStep.stepIndex + 1}`
-            : "Select a drum step"}
-        </div>
-        <label className="velocity-control">
-          <span>Velocity</span>
-          <input
-            disabled={!selectedChannel || !selectedStep}
-            max={1}
-            min={0}
-            step={0.01}
-            type="range"
-            value={selectedStep?.velocity ?? 0}
-            onInput={(event) => {
-              if (!selectedChannel || !selectedStep) {
-                return;
-              }
-
-              dispatch({
-                type: "drum/setVelocity",
-                channelId: selectedChannel.id,
-                stepIndex: selectedStep.stepIndex,
-                velocity: Number(event.currentTarget.value)
-              });
-            }}
-          />
-        </label>
-        <output className="velocity-readout">
-          {selectedStep ? `${Math.round(selectedStep.velocity * 100)}%` : "--"}
-        </output>
-      </div>
-    </section>
-  );
-};
-
-const LyricsGrid = ({
-  bars,
-  snapshot,
-  dispatch,
-  canGrowSelectedCell,
-  canShrinkSelectedCell,
-  canMergeSelectedCells,
-  canSplitSelectedCell,
-  onAddBar,
-  onRemoveLastBar,
-  onSetEightBars
-}: LyricsGridProps) => {
-  const selectedCellId = snapshot.selectedCellIds.length === 1 ? snapshot.selectedCellIds[0] : undefined;
-  const selectedCellDescription = describeSelectedCell(bars, snapshot.selectedCellIds);
-
-  return (
-    <section className="lyrics-section" aria-label="Lyrics grid">
-      <div className="lyrics-toolbar">
-        <div className="toolbar-group">
-          <span className="toolbar-meter">{formatBarCount(bars.length)}</span>
-          <button className="tool-button" type="button" onClick={onAddBar}>
-            + Bar
-          </button>
-          <button
-            className="tool-button"
-            disabled={bars.length <= 1}
-            type="button"
-            onClick={onRemoveLastBar}
-          >
-            - Bar
-          </button>
-          <button
-            className="tool-button"
-            disabled={bars.length >= TARGET_LYRIC_BAR_COUNT}
-            type="button"
-            onClick={onSetEightBars}
-          >
-            8 Bars
-          </button>
-        </div>
-        <div className="toolbar-group">
-          <span className="toolbar-meter">{selectedCellDescription}</span>
-          {[2, 3, 4].map((parts) => (
-            <button
-              className="tool-button nudge-button"
-              disabled={!canSplitSelectedCell(parts)}
-              key={parts}
-              title={`Split selected cell into ${parts}`}
-              type="button"
-              onClick={() => {
-                if (selectedCellId) {
-                  dispatch({ type: "lyrics/splitCell", cellId: selectedCellId, parts });
-                }
-              }}
-            >
-              /{parts}
-            </button>
-          ))}
-          <button
-            className="tool-button"
-            disabled={!canMergeSelectedCells}
-            title="Merge selected lyric cells"
-            type="button"
-            onClick={() => dispatch({ type: "lyrics/mergeCells", cellIds: snapshot.selectedCellIds })}
-          >
-            Merge
-          </button>
-          <button
-            aria-label="Shorten selected lyric cell"
-            className="tool-button nudge-button"
-            disabled={!selectedCellId || !canShrinkSelectedCell}
-            title="Shorten cell"
-            type="button"
-            onClick={() => {
-              if (selectedCellId) {
-                dispatch({ type: "lyrics/resizeCellBySteps", cellId: selectedCellId, deltaSteps: -1 });
-              }
-            }}
-          >
-            -
-          </button>
-          <button
-            aria-label="Lengthen selected lyric cell"
-            className="tool-button nudge-button"
-            disabled={!selectedCellId || !canGrowSelectedCell}
-            title="Lengthen cell"
-            type="button"
-            onClick={() => {
-              if (selectedCellId) {
-                dispatch({ type: "lyrics/resizeCellBySteps", cellId: selectedCellId, deltaSteps: 1 });
-              }
-            }}
-          >
-            +
-          </button>
-        </div>
-      </div>
-      {bars.map((bar) => (
-        <div className="bar-row" key={bar.id}>
-          <div className="bar-label">Bar {bar.index + 1}</div>
-          <div className="lyric-cells" role="grid" aria-label={`Bar ${bar.index + 1} lyric cells`}>
-            {bar.lyricCells.map((cell) => (
-              <LyricCellView
-                bar={bar}
-                cell={cell}
-                dispatch={dispatch}
-                key={cell.id}
-                snapshot={snapshot}
-              />
-            ))}
-          </div>
-        </div>
-      ))}
-    </section>
-  );
-};
-
-const LyricCellView = ({ bar, cell, snapshot, dispatch }: LyricCellProps) => {
-  const isSelected = snapshot.selectedCellIds.includes(cell.id);
-  const isCurrent =
-    bar.index === snapshot.currentBarIndex &&
-    snapshot.currentTickInBar >= cell.startTick &&
-    snapshot.currentTickInBar < cell.startTick + cell.durationTicks;
-  const widthWeight = cell.durationTicks / getBarTicks();
-
-  return (
-    <input
-      aria-label={`Bar ${bar.index + 1} lyric cell at ${cell.startTick}`}
-      className={[
-        "lyric-cell",
-        isSelected ? "is-selected" : "",
-        isCurrent ? "is-current" : ""
-      ]
-        .filter(Boolean)
-        .join(" ")}
-      role="gridcell"
-      style={{ flexGrow: widthWeight, flexBasis: 0 }}
-      value={cell.text}
-      onChange={(event) =>
-        dispatch({
-          type: "lyrics/updateCellText",
-          cellId: cell.id,
-          text: event.currentTarget.value
-        })
-      }
-      onClick={(event) => {
-        const nextSelection = event.ctrlKey
-          ? [...snapshot.selectedCellIds, cell.id]
-          : [cell.id];
-
-        dispatch({ type: "lyrics/selectCells", cellIds: nextSelection });
-      }}
-      onFocus={() => {
-        if (!isSelected) {
-          dispatch({ type: "lyrics/selectCells", cellIds: [cell.id] });
-        }
-      }}
-    />
-  );
-};
+const formatBarCount = (count: number): string => `${count} bar${count === 1 ? "" : "s"}`;
 
 export const App = () => {
   const controller = useMemo(() => new FlowStudioController(), []);
   const repository = useMemo(() => new DexieProjectRepository(), []);
   const importInputRef = useRef<HTMLInputElement>(null);
+  const audioEngineRef = useRef<ToneTransportEngine | undefined>(undefined);
   const saveRequestRef = useRef(0);
-  const [snapshot, setSnapshot] = useState(() => controller.getSnapshot());
+  const [snapshot, setSnapshot] = useState<AppSnapshot>(() => controller.getSnapshot());
   const [error, setError] = useState("");
   const [sampleLoadState, setSampleLoadState] = useState<SampleLoadState>("loading");
   const [storageState, setStorageState] = useState<StorageState>("idle");
@@ -610,40 +112,55 @@ export const App = () => {
     [controller, repository]
   );
 
+  const loadSamples = useCallback(async (audioEngine: ToneTransportEngine) => {
+    setSampleLoadState("loading");
+
+    try {
+      await Promise.all(
+        Object.entries(getSampleUrls()).map(([channelId, url]) =>
+          audioEngine.loadSample(channelId, url)
+        )
+      );
+
+      if (audioEngineRef.current !== audioEngine) {
+        return;
+      }
+
+      setSampleLoadState("ready");
+      setError((currentError) =>
+        currentError === "Audio samples are still loading." ||
+        currentError === "Audio samples could not load."
+          ? ""
+          : currentError
+      );
+    } catch (sampleError: unknown) {
+      if (audioEngineRef.current !== audioEngine) {
+        return;
+      }
+
+      setSampleLoadState("error");
+      setError(
+        sampleError instanceof Error ? sampleError.message : "Audio samples could not load."
+      );
+    }
+  }, []);
+
   useEffect(() => {
     const audioEngine = new ToneTransportEngine(controller.getSnapshot().project);
+    audioEngineRef.current = audioEngine;
     controller.setAudioEngine(audioEngine);
-    let isMounted = true;
-
-    setSampleLoadState("loading");
-    Promise.all(
-      Object.entries(SAMPLE_URLS).map(([channelId, url]) => audioEngine.loadSample(channelId, url))
-    )
-      .then(() => {
-        if (isMounted) {
-          setSampleLoadState("ready");
-          setError((currentError) =>
-            currentError === "Samples are still loading." ? "" : currentError
-          );
-        }
-      })
-      .catch((sampleError: unknown) => {
-        if (isMounted) {
-          setSampleLoadState("error");
-          setError(sampleError instanceof Error ? sampleError.message : "Samples could not load.");
-        }
-      });
+    void loadSamples(audioEngine);
 
     const unsubscribe = controller.subscribe((nextSnapshot) => {
       setSnapshot(nextSnapshot);
     });
 
     return () => {
-      isMounted = false;
+      audioEngineRef.current = undefined;
       audioEngine.stop();
       unsubscribe();
     };
-  }, [controller]);
+  }, [controller, loadSamples]);
 
   useEffect(() => {
     let isMounted = true;
@@ -725,6 +242,13 @@ export const App = () => {
     [controller, requestSave]
   );
 
+  const handleTitleChange = useCallback(
+    (title: string) => {
+      dispatch({ type: "project/setTitle", title });
+    },
+    [dispatch]
+  );
+
   const handleBpmChange = useCallback(
     (bpm: number) => {
       dispatch({ type: "transport/setBpm", bpm });
@@ -734,7 +258,7 @@ export const App = () => {
 
   const handlePlay = useCallback(() => {
     if (sampleLoadState !== "ready") {
-      setError("Samples are still loading.");
+      setError("Audio samples are still loading.");
       return;
     }
 
@@ -750,6 +274,14 @@ export const App = () => {
   const handleStop = useCallback(() => {
     controller.stop();
   }, [controller]);
+
+  const handleRetrySamples = useCallback(() => {
+    const audioEngine = audioEngineRef.current;
+
+    if (audioEngine) {
+      void loadSamples(audioEngine);
+    }
+  }, [loadSamples]);
 
   const handleUndo = useCallback(() => {
     if (!controller.canUndo()) {
@@ -810,8 +342,10 @@ export const App = () => {
 
     link.href = url;
     link.download = safeDownloadName(project.title);
+    document.body.append(link);
     link.click();
-    URL.revokeObjectURL(url);
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
   }, [controller]);
 
   const handleChooseImportJson = useCallback(() => {
@@ -821,7 +355,6 @@ export const App = () => {
   const handleImportJson = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
       const file = event.currentTarget.files?.[0];
-
       event.currentTarget.value = "";
 
       if (!file) {
@@ -857,16 +390,19 @@ export const App = () => {
     dispatch({ type: "project/addBar" });
   }, [dispatch]);
 
-  const handleRemoveLastBar = useCallback(() => {
-    const lastBar = snapshot.project.bars.at(-1);
-
-    if (lastBar) {
-      dispatch({ type: "project/removeBar", barId: lastBar.id });
-    }
-  }, [dispatch, snapshot.project.bars]);
+  const handleRemoveBar = useCallback(
+    (barId: string) => {
+      dispatch({ type: "project/removeBar", barId });
+    },
+    [dispatch]
+  );
 
   const handleSetEightBars = useCallback(() => {
-    for (let barIndex = snapshot.project.bars.length; barIndex < TARGET_LYRIC_BAR_COUNT; barIndex += 1) {
+    for (
+      let barIndex = snapshot.project.bars.length;
+      barIndex < TARGET_LYRIC_BAR_COUNT;
+      barIndex += 1
+    ) {
       dispatch({ type: "project/addBar" });
     }
   }, [dispatch, snapshot.project.bars.length]);
@@ -890,14 +426,27 @@ export const App = () => {
         return;
       }
 
-      if (event.ctrlKey && key === "m") {
+      if (modifier && key === "s") {
+        event.preventDefault();
+        handleSaveProject();
+        return;
+      }
+
+      if (modifier && key === "o") {
+        event.preventDefault();
+        handleChooseImportJson();
+        return;
+      }
+
+      if (modifier && key === "m") {
         event.preventDefault();
         if (selectCanMergeSelectedCells(snapshot)) {
           dispatch({ type: "lyrics/mergeCells", cellIds: snapshot.selectedCellIds });
         }
+        return;
       }
 
-      if (event.ctrlKey && event.altKey && ["2", "3", "4"].includes(event.key)) {
+      if (modifier && event.altKey && ["2", "3", "4"].includes(event.key)) {
         event.preventDefault();
         const parts = Number(event.key);
 
@@ -908,9 +457,10 @@ export const App = () => {
             parts
           });
         }
+        return;
       }
 
-      if (isTextEntryTarget(event.target) && event.key !== "Escape") {
+      if (isTextEntryTarget(event.target)) {
         return;
       }
 
@@ -923,20 +473,26 @@ export const App = () => {
         }
       }
     },
-    [dispatch, handlePause, handlePlay, handleRedo, handleUndo, snapshot]
+    [
+      dispatch,
+      handleChooseImportJson,
+      handlePause,
+      handlePlay,
+      handleRedo,
+      handleSaveProject,
+      handleUndo,
+      snapshot
+    ]
   );
 
   const channels = selectDrumChannels(snapshot);
   const bars = selectVisibleBars(snapshot);
-  const canGrowSelectedCell = selectCanResizeSelectedCell(snapshot, 1);
-  const canShrinkSelectedCell = selectCanResizeSelectedCell(snapshot, -1);
-  const canMergeSelectedCells = selectCanMergeSelectedCells(snapshot);
   const statusText =
     error ||
-    `${getSampleLabel(sampleLoadState)} / ${getStorageLabel(storageState)} / ${formatBarCount(snapshot.project.bars.length, "bar")} / ${snapshot.project.selectedCellIds.length} selected`;
+    `${getSampleLabel(sampleLoadState)} / ${getStorageLabel(storageState)} / ${formatBarCount(snapshot.project.bars.length)} / ${snapshot.project.selectedCellIds.length} selected`;
 
   return (
-    <main className="app-shell" onKeyDown={handleKeyDown} tabIndex={-1}>
+    <main className="app-shell" tabIndex={-1} onKeyDown={handleKeyDown}>
       <input
         ref={importInputRef}
         accept="application/json,.json"
@@ -945,9 +501,12 @@ export const App = () => {
         onChange={handleImportJson}
       />
       <TransportBar
-        snapshot={snapshot}
         canRedo={controller.canRedo()}
         canUndo={controller.canUndo()}
+        sampleLoadState={sampleLoadState}
+        samplesReady={sampleLoadState === "ready"}
+        snapshot={snapshot}
+        storageState={storageState}
         onBpmChange={handleBpmChange}
         onChooseImportJson={handleChooseImportJson}
         onExportJson={handleExportJson}
@@ -955,12 +514,11 @@ export const App = () => {
         onPause={handlePause}
         onPlay={handlePlay}
         onRedo={handleRedo}
+        onRetrySamples={handleRetrySamples}
         onSaveProject={handleSaveProject}
         onStop={handleStop}
+        onTitleChange={handleTitleChange}
         onUndo={handleUndo}
-        sampleLoadState={sampleLoadState}
-        samplesReady={sampleLoadState === "ready"}
-        storageState={storageState}
       />
       <DrumRack
         channels={channels}
@@ -971,17 +529,13 @@ export const App = () => {
       />
       <LyricsGrid
         bars={bars}
-        canGrowSelectedCell={canGrowSelectedCell}
-        canMergeSelectedCells={canMergeSelectedCells}
-        canShrinkSelectedCell={canShrinkSelectedCell}
-        canSplitSelectedCell={(parts) => selectCanSplitSelectedCell(snapshot, parts)}
         dispatch={dispatch}
         snapshot={snapshot}
         onAddBar={handleAddBar}
-        onRemoveLastBar={handleRemoveLastBar}
+        onRemoveBar={handleRemoveBar}
         onSetEightBars={handleSetEightBars}
       />
-      <footer className="status-strip" aria-live="polite">
+      <footer className={["status-strip", error ? "is-error" : ""].filter(Boolean).join(" ")} aria-live="polite">
         {statusText}
       </footer>
     </main>
